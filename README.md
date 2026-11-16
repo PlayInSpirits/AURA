@@ -53,70 +53,9 @@ AURA играет вашу музыкальную библиотеку с дом
 - Фиолетовая палитра AURA и чёрная AMOLED-тема по умолчанию, новая иконка.
 - Три вкладки: Главная, Поиск, Хаб. «Выйти» — внизу настроек.
 
-## Установка
-
-1. Откройте [Releases](https://github.com/PlayInSpirits/AURA-fork-HomeMusic/releases) и скачайте
-   `AURA-v….apk` из последнего релиза.
-2. Установите APK на телефон (разрешите установку из неизвестных источников).
-3. Введите адрес хаба. По умолчанию подставлен `http://192.168.1.129:4533/`.
-4. Войдите под своим логином и паролем Navidrome (это же аккаунт хаба) или зарегистрируйтесь по коду приглашения.
-
-Приложение ставится как `app.aura2.debug` и не мешает ни Tempus, ни оригинальному клиенту HomeMusic.
-Все релизы подписаны одним ключом AURA, поэтому новые версии ставятся поверх старых без удаления.
-
-### Адрес сервера
-
-- Можно ввести адрес Navidrome (`http://192.168.1.129:4533/`) или адрес хаба (`http://192.168.1.129:8080/`).
-  Приложение само найдёт хаб рядом (порты 4533 → 8080 и 8444 → 8445 стандартной схемы HomeMusic).
-- Если хаб не найден, работает только плеер: «Моя волна», вкладка «Хаб» и регистрация по коду недоступны.
-- Адрес домашнего хаба можно поменять позже: **Настройки → AURA → Адрес локального хаба**.
-- Адреса `http://` разрешены, чтобы приложение работало в домашней сети.
-
-## Сборка
-
-### Через GitHub Actions
-
-Workflow [`build-apk.yml`](.github/workflows/build-apk.yml):
-
-- собирает `assembleAuraDebug`, запускает юнит-тесты и lint;
-- подписывает APK ключом AURA из секретов репозитория (`AURA_KEYSTORE_*`); без них сборка останавливается;
-- на ветке `main` публикует APK как pre-release `aura2-v<versionName>`.
-
-Запускается на каждый push в `main` или вручную: **Actions → Build AURA APK → Run workflow**.
-Изменения только в документации (`*.md`) сборку не запускают.
-
-### Локально
-
-Нужны JDK 21 и Android SDK (проще всего через Android Studio).
-
-```bash
-./gradlew assembleAuraDebug
-```
-
-APK появится в `app/build/outputs/apk/aura/debug/`. Локальная сборка подписывается отладочным ключом и не
-установится поверх релизной версии.
-
-### Структура
-
-| Что | Где |
-| --- | --- |
-| Вариант сборки `aura`, пакет `app.aura2`, версия | `app/build.gradle`, `app/src/aura/` |
-| Клиент API хаба и «Моя волна» | `app/src/main/java/com/eddyizm/tempus/hub/` |
-| Экран входа в два шага | `ui/login/AuraConnectActivity.kt` |
-| Вкладка «Хаб» | `ui/fragment/HubFragment.kt`, `hub/HubWebHost.kt` |
-| Блок «Моя волна» и его живой фон | `ui/fragment/HomeTabMusicFragment.java`, `ui/view/WaveGlowView.kt` |
-| Плитка «AURA» в настройках | `res/xml/global_preferences.xml`, `ui/fragment/SettingsContainerFragment.java` |
-
 Приложение общается с HomeMusic только через HTTP API хаба
 ([`hub/API.md`](https://github.com/justman-1/HomeMusic-public/blob/main/hub/API.md)).
 
-## Благодарности
-
-- [Tempus](https://github.com/eddyizm/tempus) от eddyizm и [Tempo](https://github.com/CappielloAntonio/tempo)
-  от CappielloAntonio — основа приложения.
-- [HomeMusic](https://github.com/justman-1/HomeMusic-public) — сервер, хаб и шейдер фона «Моей волны».
-- [Navidrome](https://www.navidrome.org/) — музыкальный сервер.
-
 ## Лицензия
 
-[GNU GPL v3](LICENSE), как и у Tempus. Подробности и происхождение кода — в [NOTICE.md](NOTICE.md).
+[GNU GPL v3](LICENSE), самоподписанный AURA. Подробности и происхождение кода — в [NOTICE.md](NOTICE.md).
