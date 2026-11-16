@@ -53,8 +53,10 @@ AURA играет вашу музыкальную библиотеку с дом
 
 Приложение общается с HomeMusic только через HTTP API хаба
 ([`hub/API.md`](https://github.com/justman-1/HomeMusic-public/blob/main/hub/API.md)).
+
 <div align="center">
-## Лицензия
+  
+# Лицензия
 
 [GNU GPL v3](LICENSE), самоподписанный AURA.
 </div>
