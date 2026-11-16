@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AURA: ♥ in the player: rose when liked, white otherwise. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="#FFFF7EB6" android:state_checked="true" />
+    <item android:color="#E6FFFFFF" />
+</selector>

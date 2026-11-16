@@ -1,0 +1,120 @@
+name: Build AURA APK
+
+# Builds a debug APK of the "aura" flavor, runs its unit tests and lint, and (on main only) publishes
+# the APK as the pre-release aura2-v<versionName>. Start it by hand (Actions -> Build AURA APK ->
+# Run workflow) or it runs on every push to main. The APK is also under "Artifacts".
+
+on:
+  push:
+    branches: [ main, master ]
+    paths-ignore:
+      - '**.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Two runs must not upload to the same release at once.
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build debug APK, unit tests, lint (aura flavor)
+        run: ./gradlew assembleAuraDebug testAuraDebugUnitTest lintAuraDebug --stacktrace
+
+      # The APK is re-signed with the permanent AURA key (the same as AURA 0.75), so each new build
+      # installs over the previous one. Without the key secrets the run fails: no other key is used.
+      - name: Sign APK with the permanent AURA key
+        env:
+          AURA_KEYSTORE_BASE64: ${{ secrets.AURA_KEYSTORE_BASE64 }}
+          AURA_KEYSTORE_PASSWORD: ${{ secrets.AURA_KEYSTORE_PASSWORD }}
+          AURA_KEY_ALIAS: ${{ secrets.AURA_KEY_ALIAS }}
+          AURA_KEY_PASSWORD: ${{ secrets.AURA_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${AURA_KEYSTORE_BASE64:-}" ] || [ -z "${AURA_KEYSTORE_PASSWORD:-}" ] || [ -z "${AURA_KEY_ALIAS:-}" ]; then
+            echo "::error::The permanent AURA signing secrets (AURA_KEYSTORE_*) are missing or incomplete."
+            exit 1
+          fi
+          KS="$RUNNER_TEMP/aura-release.jks"
+          # The secret may carry Windows line ends or wrapping: -i skips anything that is not base64.
+          printf '%s' "$AURA_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 -di > "$KS"
+          echo "Keystore: $(stat -c %s "$KS") bytes"
+          KEY_PASS="${AURA_KEY_PASSWORD:-$AURA_KEYSTORE_PASSWORD}"
+          if ! keytool -list -keystore "$KS" -alias "$AURA_KEY_ALIAS" -storepass "$AURA_KEYSTORE_PASSWORD" > "$RUNNER_TEMP/keytool.txt" 2>&1; then
+            echo "::error::keytool cannot open the AURA keystore: $(head -n 3 "$RUNNER_TEMP/keytool.txt")"
+            exit 1
+          fi
+
+          APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n 1)apksigner"
+          echo "apksigner: $APKSIGNER"
+          OUT=app/build/outputs/apk/aura/debug
+          mkdir -p "$RUNNER_TEMP/signed"
+          for apk in "$OUT"/*.apk; do
+            "$APKSIGNER" sign --ks "$KS" --ks-pass env:AURA_KEYSTORE_PASSWORD --key-pass "pass:$KEY_PASS" \
+              --ks-key-alias "$AURA_KEY_ALIAS" --out "$RUNNER_TEMP/signed/$(basename "$apk")" "$apk"
+            mv "$RUNNER_TEMP/signed/$(basename "$apk")" "$apk"
+            "$APKSIGNER" verify --print-certs "$apk" | grep -E "certificate (DN|SHA-256)" || true
+            echo "Signed: $apk"
+          done
+          rm -f "$KS"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AURA-debug-apk
+          path: app/build/outputs/apk/aura/debug/*.apk
+          if-no-files-found: error
+
+      - name: Publish pre-release
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="$(sed -n "s/^ *versionName *['\"]\([^'\"]*\)['\"].*/\1/p" app/build.gradle | head -n 1)"
+          [ -n "$VERSION" ] || { echo "::error::versionName not found in app/build.gradle"; exit 1; }
+          TAG="aura2-v${VERSION}"
+          # With ABI splits on, take the universal APK (it runs on every device).
+          APK_SRC="$(ls app/build/outputs/apk/aura/debug/*universal*.apk 2>/dev/null | head -n 1 || true)"
+          [ -n "$APK_SRC" ] || APK_SRC="$(ls app/build/outputs/apk/aura/debug/*.apk | head -n 1)"
+          echo "APK: $APK_SRC"
+          APK="$RUNNER_TEMP/AURA-v${VERSION}.apk"
+          cp "$APK_SRC" "$APK"
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" --clobber -R "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" "$APK" -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --prerelease --title "AURA v${VERSION}" --notes ""
+          fi
+          echo "Published $(basename "$APK") to $TAG"
+
+      - name: Upload test and lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-reports
+          path: |
+            **/build/reports/
+          if-no-files-found: ignore

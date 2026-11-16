@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AURA: quiet backdrop of the screens other than Home (light theme). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient
+        android:angle="290"
+        android:startColor="#FFEDE6FF"
+        android:centerColor="#FFF7F4FD"
+        android:endColor="#FFFDF7FB"
+        android:type="linear" />
+</shape>

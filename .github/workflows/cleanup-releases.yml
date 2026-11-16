@@ -1,0 +1,31 @@
+name: Remove old pre-releases
+
+# Run by hand (Actions -> Remove old pre-releases -> Run workflow). Deletes every release and its tag
+# except AURA's own (tags aura2-v…, the prefix kept from AURA_2) and the ones listed in KEEP.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      KEEP: "aura2-v0.1.0-beta aura2-v0.2.0-beta aura2-v0.3.0-beta"
+    steps:
+      - name: Delete releases and tags
+        run: |
+          set -euo pipefail
+          keep() { case "$1" in aura2-v*) return 0;; esac; for k in $KEEP; do [ "$1" = "$k" ] && return 0; done; return 1; }
+          for tag in $(gh release list -R "$GITHUB_REPOSITORY" --limit 200 --json tagName -q '.[].tagName'); do
+            if keep "$tag"; then echo "keep $tag"; continue; fi
+            gh release delete "$tag" -R "$GITHUB_REPOSITORY" --yes --cleanup-tag
+            echo "deleted $tag"
+          done
+          for tag in $(gh api "repos/$GITHUB_REPOSITORY/tags" --paginate -q '.[].name'); do
+            if keep "$tag"; then continue; fi
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/$tag" && echo "deleted tag $tag"
+          done

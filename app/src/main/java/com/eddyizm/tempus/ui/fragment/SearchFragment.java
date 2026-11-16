@@ -1,0 +1,421 @@
+package com.eddyizm.tempus.ui.fragment;
+
+import android.content.ComponentName;
+import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
+import androidx.media3.common.util.UnstableApi;
+import androidx.media3.session.MediaBrowser;
+import androidx.media3.session.SessionToken;
+import androidx.navigation.Navigation;
+import androidx.recyclerview.widget.LinearLayoutManager;
+
+import com.eddyizm.tempus.R;
+import com.eddyizm.tempus.databinding.FragmentSearchBinding;
+import com.eddyizm.tempus.helper.recyclerview.CustomLinearSnapHelper;
+import com.eddyizm.tempus.interfaces.ClickCallback;
+import com.eddyizm.tempus.service.MediaManager;
+import com.eddyizm.tempus.service.MediaService;
+import com.eddyizm.tempus.subsonic.models.Playlist;
+import com.eddyizm.tempus.ui.activity.MainActivity;
+import com.eddyizm.tempus.ui.adapter.AlbumAdapter;
+import com.eddyizm.tempus.ui.adapter.ArtistAdapter;
+import com.eddyizm.tempus.ui.adapter.SongHorizontalAdapter;
+import com.eddyizm.tempus.ui.adapter.PlaylistHorizontalAdapter;
+import com.eddyizm.tempus.util.Constants;
+import com.eddyizm.tempus.viewmodel.PlaybackViewModel;
+import com.eddyizm.tempus.viewmodel.SearchViewModel;
+import com.eddyizm.tempus.subsonic.models.PlaylistWithSongs;
+import com.google.common.util.concurrent.ListenableFuture;
+
+import java.util.Collections;
+import java.util.List;
+
+@UnstableApi
+public class SearchFragment extends Fragment implements ClickCallback {
+    private static final String TAG = "SearchFragment";
+
+    private FragmentSearchBinding bind;
+    private MainActivity activity;
+    private SearchViewModel searchViewModel;
+    private PlaybackViewModel playbackViewModel;
+
+    private ArtistAdapter artistAdapter;
+    private AlbumAdapter albumAdapter;
+    private SongHorizontalAdapter songHorizontalAdapter;
+    private PlaylistHorizontalAdapter playlistHorizontalAdapter;
+
+    private ListenableFuture<MediaBrowser> mediaBrowserListenableFuture;
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        activity = (MainActivity) getActivity();
+
+        bind = FragmentSearchBinding.inflate(inflater, container, false);
+        View view = bind.getRoot();
+        searchViewModel = new ViewModelProvider(requireActivity()).get(SearchViewModel.class);
+        playbackViewModel = new ViewModelProvider(requireActivity()).get(PlaybackViewModel.class);
+
+        initSearchResultView();
+        initSearchView();
+        inputFocus();
+
+        return view;
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        initializeMediaBrowser();
+
+        MediaManager.registerPlaybackObserver(mediaBrowserListenableFuture, playbackViewModel);
+        observePlayback();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (songHorizontalAdapter != null) setMediaBrowserListenableFuture();
+    }
+
+    @Override
+    public void onStop() {
+        releaseMediaBrowser();
+        super.onStop();
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        bind = null;
+    }
+
+    private void initSearchResultView() {
+        // Artists
+        bind.searchResultArtistRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false));
+        bind.searchResultArtistRecyclerView.setHasFixedSize(true);
+
+        artistAdapter = new ArtistAdapter(this, false, false);
+        bind.searchResultArtistRecyclerView.setAdapter(artistAdapter);
+
+        CustomLinearSnapHelper artistSnapHelper = new CustomLinearSnapHelper();
+        artistSnapHelper.attachToRecyclerView(bind.searchResultArtistRecyclerView);
+
+        // Albums
+        bind.searchResultAlbumRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false));
+        bind.searchResultAlbumRecyclerView.setHasFixedSize(true);
+
+        albumAdapter = new AlbumAdapter(this);
+        bind.searchResultAlbumRecyclerView.setAdapter(albumAdapter);
+
+        CustomLinearSnapHelper albumSnapHelper = new CustomLinearSnapHelper();
+        albumSnapHelper.attachToRecyclerView(bind.searchResultAlbumRecyclerView);
+
+        // Songs
+        bind.searchResultTracksRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
+        bind.searchResultTracksRecyclerView.setHasFixedSize(true);
+
+        songHorizontalAdapter = new SongHorizontalAdapter(getViewLifecycleOwner(), this, true, false, null);
+        setMediaBrowserListenableFuture();
+        reapplyPlayback();
+
+        bind.searchResultTracksRecyclerView.setAdapter(songHorizontalAdapter);
+
+        bind.allsongsview.setLayoutManager(new LinearLayoutManager(requireContext()));
+        bind.allsongsview.setHasFixedSize(true);
+
+        playlistHorizontalAdapter = new PlaylistHorizontalAdapter(this);
+        bind.allsongsview.setAdapter(playlistHorizontalAdapter);
+    }
+
+    private void initSearchView() {
+        setRecentSuggestions();
+
+        bind.searchView
+                .getEditText()
+                .setOnEditorActionListener((textView, actionId, keyEvent) -> {
+                    String query = bind.searchView.getText().toString();
+
+                    if (isQueryValid(query)) {
+                        search(query);
+                        return true;
+                    }
+
+                    return false;
+                });
+
+        bind.searchView
+                .getEditText()
+                .addTextChangedListener(new TextWatcher() {
+                    @Override
+                    public void beforeTextChanged(CharSequence charSequence, int start, int count, int after) {
+
+                    }
+
+                    @Override
+                    public void onTextChanged(CharSequence charSequence, int start, int before, int count) {
+                        if (start + count > 1) {
+                            setSearchSuggestions(charSequence.toString());
+                        } else {
+                            setRecentSuggestions();
+                        }
+                    }
+
+                    @Override
+                    public void afterTextChanged(Editable editable) {
+
+                    }
+                });
+    }
+
+    public void setRecentSuggestions() {
+        bind.searchViewSuggestionContainer.removeAllViews();
+
+        for (String suggestion : searchViewModel.getRecentSearchSuggestion()) {
+            View view = LayoutInflater.from(bind.searchViewSuggestionContainer.getContext()).inflate(R.layout.item_search_suggestion, bind.searchViewSuggestionContainer, false);
+
+            ImageView leadingImageView = view.findViewById(R.id.search_suggestion_icon);
+            TextView titleView = view.findViewById(R.id.search_suggestion_title);
+            ImageView tailingImageView = view.findViewById(R.id.search_suggestion_delete_icon);
+
+            leadingImageView.setImageDrawable(getResources().getDrawable(R.drawable.ic_history, null));
+            titleView.setText(suggestion);
+
+            view.setOnClickListener(v -> search(suggestion));
+
+            tailingImageView.setOnClickListener(v -> {
+                searchViewModel.deleteRecentSearch(suggestion);
+                setRecentSuggestions();
+            });
+
+            bind.searchViewSuggestionContainer.addView(view);
+            animateSuggestion(view, bind.searchViewSuggestionContainer.getChildCount() - 1);
+        }
+    }
+
+    public void setSearchSuggestions(String query) {
+        searchViewModel.getSearchSuggestion(query).observe(getViewLifecycleOwner(), suggestions -> {
+            bind.searchViewSuggestionContainer.removeAllViews();
+
+            for (String suggestion : suggestions) {
+                View view = LayoutInflater.from(bind.searchViewSuggestionContainer.getContext()).inflate(R.layout.item_search_suggestion, bind.searchViewSuggestionContainer, false);
+
+                ImageView leadingImageView = view.findViewById(R.id.search_suggestion_icon);
+                TextView titleView = view.findViewById(R.id.search_suggestion_title);
+                ImageView tailingImageView = view.findViewById(R.id.search_suggestion_delete_icon);
+
+                leadingImageView.setImageDrawable(getResources().getDrawable(R.drawable.ic_search, null));
+                titleView.setText(suggestion);
+                tailingImageView.setVisibility(View.GONE);
+
+                view.setOnClickListener(v -> search(suggestion));
+
+                bind.searchViewSuggestionContainer.addView(view);
+                animateSuggestion(view, bind.searchViewSuggestionContainer.getChildCount() - 1);
+            }
+        });
+    }
+
+    public void search(String query) {
+        searchViewModel.setQuery(query);
+        bind.allSongs.setText(this.getView().getContext().getString(R.string.search_all_songs_loading));
+        playlistHorizontalAdapter.setItems(Collections.emptyList());
+        bind.searchBar.setText(query);
+        bind.searchView.hide();
+        performSearch(query);
+    }
+
+    public void updateUI(List<Playlist> allSongs) {
+        if (allSongs != null && !allSongs.isEmpty()) {
+            playlistHorizontalAdapter.setItems(allSongs);
+            if (getView() != null && bind != null) {
+                bind.allSongs.setText(this.getView().getContext().getString(R.string.search_all_songs_play, String.valueOf(allSongs.get(0).getName())));
+            }
+        } else {
+            playlistHorizontalAdapter.setItems(Collections.emptyList());
+        }
+    }
+    private void performSearch(String query) {
+        searchViewModel.search3(this, query).observe(getViewLifecycleOwner(), result -> {
+            int sectionsThatMatchedTheQuery = 0;
+            if (bind != null) {
+                if (result.getArtists() != null) {
+                    revealSector(bind.searchArtistSector, 0, !result.getArtists().isEmpty());
+                    artistAdapter.setItems(result.getArtists());
+                    sectionsThatMatchedTheQuery+=1;
+                } else {
+                    artistAdapter.setItems(Collections.emptyList());
+                    revealSector(bind.searchArtistSector, 0, false);
+                }
+
+                if (result.getAlbums() != null) {
+                    revealSector(bind.searchAlbumSector, 1, !result.getAlbums().isEmpty());
+                    albumAdapter.setItems(result.getAlbums());
+                    sectionsThatMatchedTheQuery+=1;
+                } else {
+                    albumAdapter.setItems(Collections.emptyList());
+                    revealSector(bind.searchAlbumSector, 1, false);
+                }
+
+                if (result.getSongs() != null) {
+                    revealSector(bind.searchSongSector, 2, !result.getSongs().isEmpty());
+                    songHorizontalAdapter.setItems(result.getSongs());
+                    sectionsThatMatchedTheQuery+=1;
+                } else {
+                    songHorizontalAdapter.setItems(Collections.emptyList());
+                    revealSector(bind.searchSongSector, 2, false);
+                }
+
+                revealSector(bind.emptyResponseContainer, 0, sectionsThatMatchedTheQuery == 0);
+            }
+        });
+
+        if (bind.searchResultLayout.getVisibility() != View.VISIBLE) {
+            bind.searchResultLayout.setAlpha(0f);
+            bind.searchResultLayout.setVisibility(View.VISIBLE);
+            bind.searchResultLayout.animate().alpha(1f).setDuration(220).start();
+        }
+        bind.searchResultNestedScrollView.smoothScrollTo(0, 0);
+    }
+
+    // ---- AURA_2: search animations ----
+
+    private static final android.view.animation.Interpolator AURA_EASE =
+            new androidx.interpolator.view.animation.FastOutSlowInInterpolator();
+
+    /** Suggestion rows slide in one after another instead of popping up together. */
+    private void animateSuggestion(View row, int index) {
+        if (index > 12) return; // rows below the fold just appear
+        row.setAlpha(0f);
+        row.setTranslationY(row.getResources().getDisplayMetrics().density * 12);
+        row.animate().alpha(1f).translationY(0f)
+                .setStartDelay(index * 22L)
+                .setDuration(200)
+                .setInterpolator(AURA_EASE)
+                .start();
+    }
+
+    /** A result section rises and fades in when it appears, and fades out before it goes. */
+    private void revealSector(View sector, int order, boolean show) {
+        sector.animate().cancel();
+        float rise = sector.getResources().getDisplayMetrics().density * 18;
+        if (show) {
+            sector.setVisibility(View.VISIBLE);
+            sector.setAlpha(0f);
+            sector.setTranslationY(rise);
+            sector.animate().alpha(1f).translationY(0f)
+                    .setStartDelay(order * 60L)
+                    .setDuration(280)
+                    .setInterpolator(AURA_EASE)
+                    .start();
+        } else if (sector.getVisibility() == View.VISIBLE) {
+            sector.animate().alpha(0f)
+                    .setStartDelay(0)
+                    .setDuration(120)
+                    .withEndAction(() -> {
+                        sector.setVisibility(View.GONE);
+                        sector.setAlpha(1f);
+                    })
+                    .start();
+        }
+    }
+
+    private boolean isQueryValid(String query) {
+        return !query.equals("") && query.trim().length() > 1;
+    }
+
+    private void inputFocus() {
+        bind.searchView.show();
+    }
+
+    private void initializeMediaBrowser() {
+        mediaBrowserListenableFuture = new MediaBrowser.Builder(requireContext(), new SessionToken(requireContext(), new ComponentName(requireContext(), MediaService.class))).buildAsync();
+    }
+
+    private void releaseMediaBrowser() {
+        MediaBrowser.releaseFuture(mediaBrowserListenableFuture);
+    }
+
+    @Override
+    public void onMediaClick(Bundle bundle) {
+        MediaManager.startQueue(mediaBrowserListenableFuture, bundle.getParcelableArrayList(Constants.TRACKS_OBJECT), bundle.getInt(Constants.ITEM_POSITION));
+        songHorizontalAdapter.notifyDataSetChanged();
+        activity.setBottomSheetInPeek(true);
+    }
+
+    @Override
+    public void onMediaLongClick(Bundle bundle) {
+        Navigation.findNavController(requireView()).navigate(R.id.songBottomSheetDialog, bundle);
+    }
+
+    @Override
+    public void onPlaylistClick(Bundle bundle) {
+        PlaylistWithSongs playlistWithSongs = bundle.getParcelable(Constants.PLAYLIST_OBJECT);
+        if (playlistWithSongs != null) {
+            MediaManager.startQueue(mediaBrowserListenableFuture, playlistWithSongs.getEntries(), 0);
+        }
+    }
+
+    @Override
+    public void onPlaylistLongClick(Bundle bundle) {
+        Navigation.findNavController(requireView()).navigate(R.id.playlistBottomSheetDialog, bundle);
+    }
+
+    @Override
+    public void onAlbumClick(Bundle bundle) {
+        Navigation.findNavController(requireView()).navigate(R.id.albumPageFragment, bundle);
+    }
+
+    @Override
+    public void onAlbumLongClick(Bundle bundle) {
+        Navigation.findNavController(requireView()).navigate(R.id.albumBottomSheetDialog, bundle);
+    }
+
+    @Override
+    public void onArtistClick(Bundle bundle) {
+        Navigation.findNavController(requireView()).navigate(R.id.artistPageFragment, bundle);
+    }
+
+    @Override
+    public void onArtistLongClick(Bundle bundle) {
+        Navigation.findNavController(requireView()).navigate(R.id.artistBottomSheetDialog, bundle);
+    }
+
+    private void observePlayback() {
+        playbackViewModel.getCurrentSongId().observe(getViewLifecycleOwner(), id -> {
+            if (songHorizontalAdapter != null) {
+                Boolean playing = playbackViewModel.getIsPlaying().getValue();
+                songHorizontalAdapter.setPlaybackState(id, playing != null && playing);
+            }
+        });
+        playbackViewModel.getIsPlaying().observe(getViewLifecycleOwner(), playing -> {
+            if (songHorizontalAdapter != null) {
+                String id = playbackViewModel.getCurrentSongId().getValue();
+                songHorizontalAdapter.setPlaybackState(id, playing != null && playing);
+            }
+        });
+    }
+
+    private void reapplyPlayback() {
+        if (songHorizontalAdapter != null) {
+            String id = playbackViewModel.getCurrentSongId().getValue();
+            Boolean playing = playbackViewModel.getIsPlaying().getValue();
+            songHorizontalAdapter.setPlaybackState(id, playing != null && playing);
+        }
+    }
+
+    private void setMediaBrowserListenableFuture() {
+        songHorizontalAdapter.setMediaBrowserListenableFuture(mediaBrowserListenableFuture);
+    }
+}
