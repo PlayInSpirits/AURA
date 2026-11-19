@@ -39,4 +39,7 @@
     <string name="aura_player_close">Collapse player</string>
     <string name="aura_player_lyrics">Lyrics</string>
     <string name="aura_player_queue">Queue</string>
+    <string name="aura_contact_author">Contact the AURA author</string>
+    <string name="aura_contact_telegram">Telegram</string>
+    <string name="aura_contact_author_url" translatable="false">https://t.me/Play_in_Spirits</string>
 </resources>

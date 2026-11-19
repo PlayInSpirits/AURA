@@ -725,6 +725,15 @@
                 android:action="android.intent.action.VIEW"
                 android:data="@string/aura_project_url" />
         </Preference>
+
+        <Preference
+            android:key="aura_contact_author"
+            app:summary="@string/aura_contact_telegram"
+            app:title="@string/aura_contact_author">
+            <intent
+                android:action="android.intent.action.VIEW"
+                android:data="@string/aura_contact_author_url" />
+        </Preference>
     </com.eddyizm.tempus.util.ClickablePreferenceCategory>
 
     <!-- AURA: «Выйти» at the very bottom, as in the hub's «Ещё» -->

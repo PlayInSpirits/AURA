@@ -31,4 +31,6 @@
     <string name="aura_player_close">Свернуть плеер</string>
     <string name="aura_player_lyrics">Текст песни</string>
     <string name="aura_player_queue">Очередь</string>
+    <string name="aura_contact_author">Связаться с автором AURA</string>
+    <string name="aura_contact_telegram">Телеграмм</string>
 </resources>
