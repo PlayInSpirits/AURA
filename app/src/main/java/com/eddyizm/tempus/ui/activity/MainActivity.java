@@ -178,6 +178,7 @@ public class MainActivity extends BaseActivity {
     @Override
     protected void onStart() {
         super.onStart();
+        if (drawBehindStatusBar) applyStatusBarAppearance();
         DownloadUtil.queueDeferredDownloads();
         pingServer();
         initService();
@@ -908,19 +909,28 @@ public class MainActivity extends BaseActivity {
     private int statusBarInset = 0;
 
     /** AURA: lets the current screen draw under the status bar (Home's wave). */
-    @SuppressWarnings("deprecation")
     public void setDrawBehindStatusBar(boolean behind) {
         if (drawBehindStatusBar == behind) return;
         drawBehindStatusBar = behind;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            getWindow().setStatusBarContrastEnforced(defaultStatusBarContrast && !behind);
-        }
+        applyStatusBarAppearance();
         View rootView = findViewById(android.R.id.content);
         if (rootView != null) {
             rootView.setPadding(rootView.getPaddingLeft(), behind ? 0 : statusBarInset, rootView.getPaddingRight(), 0);
             ViewCompat.requestApplyInsets(rootView);
         }
         applyPlayerTopInset();
+    }
+
+    @SuppressWarnings("deprecation")
+    private void applyStatusBarAppearance() {
+        if (drawBehindStatusBar) {
+            getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
+        } else {
+            com.eddyizm.tempus.helper.ThemeHelper.setNavigationBarColor(this);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            getWindow().setStatusBarContrastEnforced(defaultStatusBarContrast && !drawBehindStatusBar);
+        }
     }
 
     /** The open player must not slide under the status bar when the screen behind it draws there. */
