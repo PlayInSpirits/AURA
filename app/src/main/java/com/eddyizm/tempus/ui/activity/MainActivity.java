@@ -904,12 +904,17 @@ public class MainActivity extends BaseActivity {
     }
 
     private boolean drawBehindStatusBar = false;
+    private boolean defaultStatusBarContrast;
     private int statusBarInset = 0;
 
     /** AURA: lets the current screen draw under the status bar (Home's wave). */
+    @SuppressWarnings("deprecation")
     public void setDrawBehindStatusBar(boolean behind) {
         if (drawBehindStatusBar == behind) return;
         drawBehindStatusBar = behind;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            getWindow().setStatusBarContrastEnforced(defaultStatusBarContrast && !behind);
+        }
         View rootView = findViewById(android.R.id.content);
         if (rootView != null) {
             rootView.setPadding(rootView.getPaddingLeft(), behind ? 0 : statusBarInset, rootView.getPaddingRight(), 0);
@@ -935,7 +940,11 @@ public class MainActivity extends BaseActivity {
         navigationController.leaveHub();
     }
 
+    @SuppressWarnings("deprecation")
     private void fixUpEdgeToEdge() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            defaultStatusBarContrast = getWindow().isStatusBarContrastEnforced();
+        }
         View rootView = findViewById(android.R.id.content);
         ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
