@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- AURA: big white play/pause button of the full-screen player. -->
-<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#330E0C16">
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#3328193B">
     <item>
         <shape android:shape="oval">
-            <solid android:color="#FFFFFFFF" />
+            <solid android:color="@color/aura_player_accent" />
         </shape>
     </item>
 </ripple>

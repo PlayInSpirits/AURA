@@ -91,7 +91,9 @@ public class MappingUtil {
             String coverArtId = effective.getCoverArtId();
             Uri artworkUri = null;
 
-            if (coverArtId != null) {
+            if (com.eddyizm.tempus.hub.HubPlayback.isCatalogSong(media.getId())) {
+                artworkUri = com.eddyizm.tempus.hub.HubPlayback.artwork(media);
+            } else if (coverArtId != null) {
                 artworkUri = AlbumArtContentProvider.contentUri(coverArtId);
             }
 
@@ -133,6 +135,7 @@ public class MappingUtil {
             bundle.putInt("originalWidth", media.getOriginalWidth() != null ? media.getOriginalWidth() : 0);
             bundle.putInt("originalHeight", media.getOriginalHeight() != null ? media.getOriginalHeight() : 0);
             bundle.putString("uri", uri.toString());
+            bundle.putString(com.eddyizm.tempus.hub.HubPlayback.WAVE_SESSION, media.getAuraWaveSession());
 
             // Pack ReplayGain data from the server response so ReplayGainUtil
             // can apply gain synchronously at track transitions without a
@@ -544,6 +547,8 @@ public class MappingUtil {
     }
 
     private static Uri getUri(Child media) {
+        Uri hubUri = com.eddyizm.tempus.hub.HubPlayback.streamUri(media.getId());
+        if (hubUri != null) return hubUri;
         String localUri = getDownloadUris().get(media.getId());
         if (localUri != null) {
             return Uri.parse(localUri);

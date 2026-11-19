@@ -75,10 +75,19 @@ public class SettingsFragment extends Fragment {
     @Override
     public void onStart() {
         super.onStart();
+        applyAuraSurface();
         activity.setBottomNavigationBarVisibility(false);
         activity.setBottomSheetVisibility(false);
         activity.setNavigationDrawerLock(true);
         activity.setSystemBarsVisibility(!isLandscape);
+    }
+
+    public void applyAuraSurface() {
+        if (bind == null) return;
+        int color = com.eddyizm.tempus.ui.view.AuraAppearance.color(
+                requireContext(), com.eddyizm.tempus.ui.view.AuraAppearance.SETTINGS);
+        bind.getRoot().setBackgroundColor(color);
+        bind.settingsToolbar.setBackgroundColor(color);
     }
 
     @Override
@@ -93,6 +102,9 @@ public class SettingsFragment extends Fragment {
     }
 
     private void initAppBar() {
+        if (com.eddyizm.tempus.BuildConfig.FLAVOR.equals("aura")) {
+            bind.settingsToolbar.setTitle(R.string.aura_settings_screen_title);
+        }
         bind.settingsToolbar.inflateMenu(R.menu.settings_menu);
         MenuItem searchItem = bind.settingsToolbar.getMenu().findItem(R.id.action_search);
         if (searchItem != null) {

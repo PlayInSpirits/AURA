@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AuraDisplay" parent="TextAppearance.Material3.HeadlineMedium">
+        <item name="android:fontFamily">sans-serif-black</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.095</item>
+        <item name="android:textColor">#E2D2FF</item>
+    </style>
+    <string name="aura_hub_wordmark" translatable="false">HUB</string>
+    <string name="aura_hub_good_morning">Good morning, %1$s</string>
+    <string name="aura_hub_good_day">Good afternoon, %1$s</string>
+    <string name="aura_hub_good_evening">Good evening, %1$s</string>
+    <string name="aura_hub_good_night">Good night, %1$s</string>
+    <string name="aura_project_url" translatable="false">https://github.com/PlayInSpirits/AURA</string>
+    <string name="aura_wave_display_title">MY WAVE</string>
+    <string name="aura_shortcut_albums">Albums</string>
+    <string name="aura_appearance_title">AURA appearance</string>
+    <string name="aura_appearance_logo">Logo and wave title</string>
+    <string name="aura_appearance_settings">Settings surface</string>
+    <string name="aura_appearance_tiles">Tabs and home cards</string>
+    <string name="aura_appearance_glow">Soft text glow</string>
+    <string name="aura_appearance_blur">Animate wave background</string>
+    <string name="aura_appearance_softness">Wave blur</string>
+    <string name="aura_appearance_reset">Reset</string>
+    <string name="aura_now_playing">Now playing</string>
+    <string name="aura_pause_wave">Pause wave</string>
+    <string name="aura_hub_play_error">Could not play this Hub track</string>
+    <string name="aura_settings_screen_title">Settings</string>
+    <string name="aura_settings_downloads">Downloads</string>
+    <string name="aura_settings_home">Home screen</string>
+    <string name="aura_settings_account">Account and server</string>
+    <string name="aura_settings_card_appearance">Colors and wave background</string>
+    <string name="aura_settings_card_sound">Equalizer and volume</string>
+    <string name="aura_settings_card_downloads">Offline and cache</string>
+    <string name="aura_settings_card_home">Layout and navigation</string>
+    <string name="aura_player_track_details">Track details</string>
+    <string name="aura_player_speed_menu">Playback speed</string>
+    <string name="aura_player_open_album">Open album</string>
+    <string name="aura_player_close">Collapse player</string>
+    <string name="aura_player_lyrics">Lyrics</string>
+    <string name="aura_player_queue">Queue</string>
+</resources>

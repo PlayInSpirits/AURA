@@ -613,6 +613,9 @@ open class BaseMediaService : MediaLibraryService(), MediaManager.QueueTarget {
                 super.onPlaybackStateChanged(playbackState)
                 if (playbackState != Player.STATE_IDLE) stoppedSinceError = false
                 if (!player.hasNextMediaItem() && playbackState == Player.STATE_ENDED) {
+                    player.currentMediaItem?.let {
+                        MediaServiceExtensionRegistry.handler?.onTrackEnded(it, player.currentPosition, true)
+                    }
                     if (player.mediaMetadata.extras?.getString("type") == Constants.MEDIA_TYPE_MUSIC) {
                         MediaManager.scrobble(player.currentMediaItem, true)
                         MediaManager.saveChronology(player.currentMediaItem)
@@ -624,6 +627,15 @@ open class BaseMediaService : MediaLibraryService(), MediaManager.QueueTarget {
                 updateWidget(player)
             }
 
+            override fun onEvents(player: Player, events: Player.Events) {
+                if (events.containsAny(
+                        Player.EVENT_MEDIA_ITEM_TRANSITION,
+                        Player.EVENT_IS_PLAYING_CHANGED,
+                        Player.EVENT_PLAYBACK_STATE_CHANGED
+                    )
+                ) MediaServiceExtensionRegistry.handler?.onPlaybackChanged(player, this@BaseMediaService)
+            }
+
             override fun onPositionDiscontinuity(
                 oldPosition: Player.PositionInfo,
                 newPosition: Player.PositionInfo,
@@ -631,6 +643,13 @@ open class BaseMediaService : MediaLibraryService(), MediaManager.QueueTarget {
             ) {
                 Log.d(TAG, "onPositionDiscontinuity reason=$reason old=${oldPosition.mediaItemIndex} new=${newPosition.mediaItemIndex}")
                 super.onPositionDiscontinuity(oldPosition, newPosition, reason)
+                oldPosition.mediaItem?.let { old ->
+                    if (old.mediaId != newPosition.mediaItem?.mediaId) {
+                        MediaServiceExtensionRegistry.handler?.onTrackEnded(
+                            old, oldPosition.positionMs, reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION
+                        )
+                    }
+                }
                 if (reason == Player.DISCONTINUITY_REASON_SEEK) scheduleQueueSync()
                 // Save the resume point of the track we're leaving whenever we move to a
                 // different track, so coming back to it later resumes where it was. (Pause

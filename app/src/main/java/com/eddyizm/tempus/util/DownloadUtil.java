@@ -96,8 +96,11 @@ public final class DownloadUtil {
             DataSource.Factory headersFactory = new CustomHeadersDataSource.Factory(
                     serverHttpFactory,
                     new OkHttpDataSource.Factory(buildCustomHeadersHttpClient()),
-                    url -> !ServerHeaders.getHeadersForActiveServer(url).isEmpty());
-            httpDataSourceFactory = new ResolvingDataSource.Factory(headersFactory, ConnectionUtil::moveStreamToAddressInUse);
+                    url -> com.eddyizm.tempus.hub.HubPlayback.isHubStream(url)
+                            || !ServerHeaders.getHeadersForActiveServer(url).isEmpty());
+            httpDataSourceFactory = new ResolvingDataSource.Factory(headersFactory, spec ->
+                    com.eddyizm.tempus.hub.HubPlayback.isHubStream(spec.uri.toString())
+                            ? spec : ConnectionUtil.moveStreamToAddressInUse(spec));
         }
 
         return httpDataSourceFactory;
@@ -116,6 +119,7 @@ public final class DownloadUtil {
                 .protocols(Collections.singletonList(Protocol.HTTP_1_1))
                 .connectTimeout(DefaultHttpDataSource.DEFAULT_CONNECT_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
                 .readTimeout(DefaultHttpDataSource.DEFAULT_READ_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
+                .addNetworkInterceptor(com.eddyizm.tempus.hub.HubPlayback.streamHeaders())
                 .addNetworkInterceptor(ServerHeaders.createInterceptor());
         if (ClientCertManager.INSTANCE.getSslSocketFactory() != null) {
             builder.sslSocketFactory(ClientCertManager.INSTANCE.getSslSocketFactory(),

@@ -14,7 +14,6 @@ import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.Player;
-import androidx.media3.common.Timeline;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.session.MediaBrowser;
 import androidx.media3.session.SessionCommand;
@@ -273,6 +272,24 @@ public class MediaManager {
 
     @OptIn(markerClass = UnstableApi.class)
     public static void startQueue(ListenableFuture<MediaBrowser> mediaBrowserListenableFuture, List<Child> media, int startIndex, long startPositionMs) {
+        long selection = beginQueueSelection();
+        startSelectedQueue(mediaBrowserListenableFuture, media, startIndex, startPositionMs, selection);
+    }
+
+    private static final java.util.concurrent.atomic.AtomicLong queueSelection = new java.util.concurrent.atomic.AtomicLong();
+
+    public static long beginQueueSelection() {
+        return queueSelection.incrementAndGet();
+    }
+
+    public static boolean isQueueSelectionCurrent(long selection) {
+        return queueSelection.get() == selection;
+    }
+
+    @OptIn(markerClass = UnstableApi.class)
+    public static void startSelectedQueue(ListenableFuture<MediaBrowser> mediaBrowserListenableFuture, List<Child> media,
+                                          int startIndex, long startPositionMs, long selection) {
+        if (!isQueueSelectionCurrent(selection)) return;
         if (LanRemoteSession.routeSongs(media, "replace", startIndex, startPositionMs)) return;
         if (mediaBrowserListenableFuture != null) {
 
@@ -289,30 +306,15 @@ public class MediaManager {
                             final List<MediaItem> items = MappingUtil.mapMediaItems(media);
 
                             new Handler(Looper.getMainLooper()).post(() -> {
-                                if (LanRemoteSession.isActive()) return;
+                                if (LanRemoteSession.isActive() || !isQueueSelectionCurrent(selection)
+                                        || items.isEmpty() || !browser.isConnected()) return;
                                 justStarted.set(true);
-                                browser.setMediaItems(items, startIndex, startPositionMs);
+                                int safeIndex = Math.max(0, Math.min(startIndex, items.size() - 1));
+                                browser.setMediaItems(items, safeIndex, startPositionMs);
                                 browser.prepare();
-
-                                Player.Listener timelineListener = new Player.Listener() {
-                                    @Override
-                                    public void onTimelineChanged(Timeline timeline, int reason) {
-                                        int itemCount = browser.getMediaItemCount();
-                                        if (itemCount > 0 && startIndex >= 0 && startIndex < itemCount) {
-                                            if (LanRemoteSession.isActive()) { browser.removeListener(this); return; }
-                                            browser.seekTo(startIndex, startPositionMs);
-                                            browser.play();
-                                            browser.removeListener(this);
-                                        } else {
-                                            Log.d(TAG, "Cannot start playback: itemCount=" + itemCount + ", startIndex=" + startIndex);
-                                        }
-                                    }
-                                };
-
-                                browser.addListener(timelineListener);
+                                browser.play();
+                                enqueueDatabase(media, true, 0);
                             });
-
-                            if (!LanRemoteSession.isActive()) enqueueDatabase(media, true, 0);
                         });
                     }
                 } catch (ExecutionException | InterruptedException e) {
@@ -323,27 +325,11 @@ public class MediaManager {
     }
 
     public static void startQueue(ListenableFuture<MediaBrowser> mediaBrowserListenableFuture, Child media) {
-        if (LanRemoteSession.routeSongs(Collections.singletonList(media), "replace", 0)) return;
-        if (mediaBrowserListenableFuture != null) {
-            mediaBrowserListenableFuture.addListener(() -> {
-                try {
-                    if (mediaBrowserListenableFuture.isDone()) {
-                        if (LanRemoteSession.isActive()) return;
-                        MediaBrowser browser = mediaBrowserListenableFuture.get();
-                        justStarted.set(true);
-                        browser.setMediaItem(MappingUtil.mapMediaItem(media));
-                        browser.prepare();
-                        browser.play();
-                        enqueueDatabase(media, true, 0);
-                    }
-                } catch (ExecutionException | InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }, MoreExecutors.directExecutor());
-        }
+        startQueue(mediaBrowserListenableFuture, Collections.singletonList(media), 0);
     }
 
     public static void playDownloadedMediaItem(ListenableFuture<MediaBrowser> mediaBrowserListenableFuture, MediaItem mediaItem) {
+        beginQueueSelection();
         if (mediaItem != null && LanRemoteSession.routeSongs(Collections.singletonList(MappingUtil.mapToChild(mediaItem)), "replace", 0)) return;
         if (mediaBrowserListenableFuture != null && mediaItem != null) {
             mediaBrowserListenableFuture.addListener(() -> {
@@ -365,6 +351,7 @@ public class MediaManager {
     }
 
     public static void startRadio(ListenableFuture<MediaBrowser> mediaBrowserListenableFuture, InternetRadioStation internetRadioStation) {
+        beginQueueSelection();
         if (LanRemoteSession.rejectUnsupported()) return;
         if (mediaBrowserListenableFuture != null) {
             mediaBrowserListenableFuture.addListener(() -> {
@@ -577,6 +564,13 @@ public class MediaManager {
         getQueueRepository().deleteRange(fromItem, toItem);
     }
 
+    public static void replaceUpcoming(QueueTarget target, int start, List<Child> songs, List<MediaItem> items) {
+        Player player = target.livePlayer();
+        if (player == null || start != player.getCurrentMediaItemIndex() + 1) return;
+        player.replaceMediaItems(start, player.getMediaItemCount(), items);
+        getQueueRepository().replaceUpcoming(start, songs);
+    }
+
     public static void getCurrentIndex(ListenableFuture<MediaBrowser> mediaBrowserListenableFuture, MediaIndexCallback callback) {
         if (LanRemoteSession.isActive()) { callback.onRecovery(LanRemoteSession.current().getIndex()); return; }
         if (mediaBrowserListenableFuture != null) {
@@ -658,6 +652,7 @@ public class MediaManager {
 
     public static void scrobble(MediaItem mediaItem, boolean submission) {
         if (mediaItem != null && mediaItem.mediaMetadata.extras != null && Preferences.isScrobblingEnabled()) {
+            if (com.eddyizm.tempus.hub.HubPlayback.isCatalogSong(mediaItem.mediaId)) return;
             getSongRepository().scrobble(mediaItem.mediaMetadata.extras.getString("id"), submission);
         }
     }

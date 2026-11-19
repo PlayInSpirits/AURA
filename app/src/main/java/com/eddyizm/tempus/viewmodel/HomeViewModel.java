@@ -30,8 +30,6 @@ import com.eddyizm.tempus.subsonic.models.Share;
 import com.eddyizm.tempus.util.Constants;
 import com.eddyizm.tempus.util.Constants.SeedType;
 import com.eddyizm.tempus.util.Preferences;
-import com.google.common.reflect.TypeToken;
-import com.google.gson.Gson;
 
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -440,22 +438,15 @@ public class HomeViewModel extends AndroidViewModel {
     }
 
     private void setHomeSectorList() {
-        if (Preferences.getHomeSectorList() != null && !Preferences.getHomeSectorList().equals("null")) {
-            sectors = new Gson().fromJson(
-                    Preferences.getHomeSectorList(),
-                    new TypeToken<List<HomeSector>>() {
-                    }.getType()
-            );
-            // Migrate saved layouts that predate the Continue listening sector.
-            if (sectors != null && sectors.stream().noneMatch(s -> Constants.HOME_SECTOR_CONTINUE_LISTENING.equals(s.getId()))) {
-                sectors.add(new HomeSector(Constants.HOME_SECTOR_CONTINUE_LISTENING, getApplication().getString(R.string.home_title_continue_listening), true, 2));
-                Preferences.setHomeSectorList(sectors);
-            }
-        }
+        sectors = HomeRearrangementViewModel.loadHomeSectors(getApplication());
     }
 
     public List<HomeSector> getHomeSectorList() {
         return sectors;
+    }
+
+    public void refreshHomeSections() {
+        setHomeSectorList();
     }
 
     public boolean checkHomeSectorVisibility(String sectorId) {

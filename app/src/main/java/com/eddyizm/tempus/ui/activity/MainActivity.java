@@ -267,8 +267,10 @@ public class MainActivity extends BaseActivity {
         navigationController.syncWithBottomSheetBehavior(bottomSheetBehavior, navController);
 
         // AURA: Home's wave reaches under the status bar; every other screen starts below it.
-        navController.addOnDestinationChangedListener((controller, destination, arguments) ->
-                setDrawBehindStatusBar(destination.getId() == R.id.homeFragment));
+        navController.addOnDestinationChangedListener((controller, destination, arguments) -> {
+            setDrawBehindStatusBar(destination.getId() == R.id.homeFragment);
+            updatePlayerPeekHeight();
+        });
     }
 
     public NavigationController getNavigationController() {
@@ -300,6 +302,29 @@ public class MainActivity extends BaseActivity {
     }
 
     public void initBackPressedDispatcher() {
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (bind.drawerLayout.isDrawerOpen(bind.navView)) {
+                    bind.drawerLayout.closeDrawer(bind.navView);
+                    return;
+                }
+                int destination = navController.getCurrentDestination() == null
+                        ? 0 : navController.getCurrentDestination().getId();
+                if (destination == R.id.homeFragment) {
+                    moveTaskToBack(true);
+                } else if (destination == R.id.settingsFragment || destination == R.id.hubFragment) {
+                    leaveHub();
+                } else {
+                    setEnabled(false);
+                    try {
+                        getOnBackPressedDispatcher().onBackPressed();
+                    } finally {
+                        setEnabled(true);
+                    }
+                }
+            }
+        });
         OnBackPressedCallback callback = new OnBackPressedCallback(bottomSheetBehavior.getState() == BottomSheetBehavior.STATE_EXPANDED) {
             @Override
             public void handleOnBackPressed() {
@@ -423,26 +448,31 @@ public class MainActivity extends BaseActivity {
     }
 
     public void toggleBottomNavigationBarVisibilityOnOrientationChange() {
-        float displayDensity = getResources().getDisplayMetrics().density;
+        updatePlayerPeekHeight();
         // Ignore orientation change, bottom navbar always hidden
         if (Preferences.getHideBottomNavbarOnPortrait()) {
             navigationController.setNavbarVisibility(false);
-            bottomSheetController.setPeekHeight(56, displayDensity);
             navigationController.setSystemBarsVisibility(this, !isLandscape);
             return;
         }
 
         if (!isLandscape) {
             // Show app navbar + show system bars
-            bottomSheetController.setPeekHeight(136, displayDensity);
             navigationController.setNavbarVisibility(true);
             navigationController.setSystemBarsVisibility(this, true);
         } else {
             // Hide app navbar + hide system bars
-            bottomSheetController.setPeekHeight(56, displayDensity);
             navigationController.setNavbarVisibility(false);
             navigationController.setSystemBarsVisibility(this, false);
         }
+    }
+
+    private void updatePlayerPeekHeight() {
+        int destination = navController.getCurrentDestination() == null ? 0 : navController.getCurrentDestination().getId();
+        boolean inlinePlayer = destination == R.id.homeFragment || destination == R.id.hubFragment;
+        int height = inlinePlayer ? 0 : isLandscape || Preferences.getHideBottomNavbarOnPortrait() ? 56 : 112;
+        bottomSheetController.setPeekHeight(height, getResources().getDisplayMetrics().density);
+        bottomSheetBehavior.setGestureInsetBottomIgnored(inlinePlayer);
     }
 
     public void setNavigationDrawerLock(boolean locked) {

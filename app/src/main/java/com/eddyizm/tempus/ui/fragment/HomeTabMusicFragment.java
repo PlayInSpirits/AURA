@@ -29,10 +29,8 @@ import androidx.media3.common.util.UnstableApi;
 import androidx.media3.session.MediaBrowser;
 import androidx.media3.common.Player;
 import androidx.core.content.ContextCompat;
-import android.animation.ObjectAnimator;
-import android.animation.PropertyValuesHolder;
-import android.animation.ValueAnimator;
 import com.eddyizm.tempus.hub.HubWave;
+import com.eddyizm.tempus.ui.view.AuraAppearance;
 import androidx.media3.session.SessionToken;
 import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.GridLayoutManager;
@@ -120,12 +118,10 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
     // AURA_2: My Wave block
     @Nullable
     private MediaBrowser waveBrowser;
-    @Nullable
-    private ObjectAnimator wavePulse;
     private boolean waveLoading = false;
     private final Player.Listener waveListener = new Player.Listener() {
         @Override
-        public void onIsPlayingChanged(boolean isPlaying) {
+        public void onEvents(@NonNull Player player, @NonNull Player.Events events) {
             updateWaveUi();
         }
 
@@ -134,7 +130,6 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
             if (bind != null && waveIsCurrent() && reason != Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) {
                 bind.homeAuraWave.auraWaveGlow.skip();
             }
-            updateWaveUi();
         }
     };
     @Nullable
@@ -165,6 +160,13 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
         super.onViewCreated(view, savedInstanceState);
 
         initAuraWave();
+        bind.auraOpenPlaylists.setOnClickListener(v -> activity.navController.navigate(R.id.playlistCatalogueFragment));
+        bind.auraOpenAlbums.setOnClickListener(v -> activity.navController.navigate(R.id.albumCatalogueFragment));
+        requireActivity().getSupportFragmentManager().setFragmentResultListener("aura_home_sections",
+                getViewLifecycleOwner(), (key, result) -> {
+                    homeViewModel.refreshHomeSections();
+                    reorder();
+                });
 
         // AURA_2: the sections are set up a few per frame after the first one, so a tab switch shows
         // Home (and its animation) at once instead of freezing while every carousel is built.
@@ -217,10 +219,41 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
     @Override
     public void onResume() {
         super.onResume();
+        bind.auraOpenPlaylists.setBackgroundTintList(null);
+        bind.auraOpenAlbums.setBackgroundTintList(null);
+        bind.auraOpenPlaylists.setBackground(AuraAppearance.panel(requireContext(), 22f, .31f));
+        bind.auraOpenAlbums.setBackground(AuraAppearance.panel(requireContext(), 22f, .18f));
+        int textColor = com.google.android.material.color.MaterialColors.getColor(bind.getRoot(),
+                com.google.android.material.R.attr.colorOnSurface);
+        bind.auraOpenPlaylists.setTextColor(textColor);
+        bind.auraOpenAlbums.setTextColor(textColor);
+        bind.homeDiscoverSector.setBackground(AuraAppearance.panel(requireContext(), 26f, .16f));
+        for (View section : new View[]{bind.pinnedPlaylistsSector, bind.starredAlbumsSector,
+                bind.starredArtistsSector, bind.homeGridTracksSector, bind.homeContinueListeningSector,
+                bind.homeBestOfArtistSector, bind.sharesSector, bind.homeRadioArtistSector,
+                bind.homeNewReleasesSector, bind.homeMostPlayedAlbumsSector, bind.homeRecentlyPlayedAlbumsSector,
+                bind.homeRecentlyAddedAlbumsSector}) {
+            section.setBackground(AuraAppearance.panel(requireContext(), 20f, .08f));
+        }
+        AuraAppearance.applyWordmark(bind.homeAuraWave.auraWaveTitle);
+        applyHeroScroll(bind.getRoot().getScrollY());
+        View glow = bind.homeAuraWave.auraWaveGlow;
+        if (bind.getRoot().getScrollY() < bind.getRoot().getSnapHeight()) {
+            float target = glow.getAlpha();
+            glow.setAlpha(0f);
+            glow.animate().alpha(target).setDuration(200).start();
+        }
         refreshSharesView();
         refreshPlaylistView();
         if (topSongAdapter != null) setTopSongsMediaBrowserListenableFuture();
         if (starredSongAdapter != null) setStarredSongsMediaBrowserListenableFuture();
+    }
+
+    @Override
+    public void onPause() {
+        bind.homeAuraWave.auraWaveGlow.animate().cancel();
+        bind.homeAuraWave.auraWaveGlow.setRenderingEnabled(false);
+        super.onPause();
     }
 
     @Override
@@ -235,11 +268,6 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
         if (activity != null) {
             activity.getWindow().getDecorView().getViewTreeObserver().removeOnGlobalLayoutListener(heroSizer);
         }
-        if (hintBob != null) {
-            hintBob.cancel();
-            hintBob = null;
-        }
-        stopWavePulse();
         if (waveCoverTarget != null) {
             Glide.with(this).clear(waveCoverTarget);
             waveCoverTarget = null;
@@ -253,6 +281,9 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
 
     private void initAuraWave() {
         bind.homeAuraWave.auraWaveButton.setOnClickListener(v -> onWaveClick());
+        bind.homeAuraWave.auraWaveCover.setClipToOutline(true);
+        AuraAppearance.applyWordmark(bind.homeAuraWave.auraWaveTitle);
+        bind.homeAuraWave.auraWaveHint.setOnClickListener(v -> bind.getRoot().snapTo(bind.getRoot().getSnapHeight()));
         initWaveHero();
         updateWaveUi();
     }
@@ -260,8 +291,6 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
     // ---- AURA: the hero fills the first screen; Home's sections wait below it ----
 
     private final android.view.ViewTreeObserver.OnGlobalLayoutListener heroSizer = this::sizeHero;
-    @Nullable
-    private ObjectAnimator hintBob;
     private int heroHeight = 0;
 
     private int dp(float v) {
@@ -281,21 +310,15 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
         });
         requireActivity().getWindow().getDecorView().getViewTreeObserver().addOnGlobalLayoutListener(heroSizer);
 
-        // The button gives way under the finger and springs back.
-        bind.homeAuraWave.auraWaveButton.setOnTouchListener((v, ev) -> {
-            switch (ev.getActionMasked()) {
-                case android.view.MotionEvent.ACTION_DOWN:
-                    v.animate().scaleX(0.9f).scaleY(0.9f).setDuration(140)
-                            .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
-                    break;
-                case android.view.MotionEvent.ACTION_UP:
-                case android.view.MotionEvent.ACTION_CANCEL:
-                    v.animate().scaleX(1f).scaleY(1f).setDuration(520)
-                            .setInterpolator(new android.view.animation.OvershootInterpolator(3f)).start();
-                    break;
-            }
-            return false;
-        });
+        bind.homeAuraWave.auraWaveButton.setOnTouchListener(new com.eddyizm.tempus.ui.view.AuraTrackGestures(
+                () -> waveBrowser != null && waveBrowser.getCurrentMediaItem() != null,
+                () -> {
+                    if (waveBrowser != null && waveBrowser.hasNextMediaItem()) waveBrowser.seekToNextMediaItem();
+                    return kotlin.Unit.INSTANCE;
+                }, () -> {
+                    if (waveBrowser != null) waveBrowser.pause();
+                    return kotlin.Unit.INSTANCE;
+                }));
 
         // Entrance: the content rises softly into place.
         View content = bind.homeAuraWave.auraWaveContent;
@@ -304,12 +327,6 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
         content.animate().alpha(1f).translationY(0f).setStartDelay(60).setDuration(700)
                 .setInterpolator(new android.view.animation.DecelerateInterpolator(2.2f)).start();
 
-        hintBob = ObjectAnimator.ofFloat(bind.homeAuraWave.auraWaveHintArrow, View.TRANSLATION_Y, 0f, -dp(6));
-        hintBob.setDuration(950);
-        hintBob.setRepeatCount(ValueAnimator.INFINITE);
-        hintBob.setRepeatMode(ValueAnimator.REVERSE);
-        hintBob.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
-        hintBob.start();
     }
 
     /** The hero ends where the bottom bars (tabs, mini player) begin, so the sections start below the fold. */
@@ -321,14 +338,11 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
         scroll.getLocationInWindow(loc);
         int bottom = loc[1] + scroll.getHeight();
         int obstacle = bottom;
-        for (int id : new int[]{R.id.bottom_navigation, R.id.player_bottom_sheet}) {
-            View bar = activity.findViewById(id);
-            if (bar == null || bar.getVisibility() != View.VISIBLE || bar.getHeight() == 0) continue;
-            int[] l = new int[2];
-            bar.getLocationInWindow(l);
-            // An expanded player covers Home anyway.
-            if (l[1] < loc[1] + scroll.getHeight() / 2) continue;
-            if (l[1] < obstacle) obstacle = l[1];
+        View bar = activity.findViewById(R.id.bottom_navigation);
+        if (bar != null && bar.getVisibility() == View.VISIBLE && bar.getHeight() > 0) {
+            int[] barPosition = new int[2];
+            bar.getLocationInWindow(barPosition);
+            if (barPosition[1] >= loc[1] + scroll.getHeight() / 2) obstacle = Math.min(bottom, barPosition[1]);
         }
         int height = Math.max(dp(420), obstacle - loc[1]);
         View hero = bind.homeAuraWave.getRoot();
@@ -338,7 +352,17 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
             hero.setLayoutParams(lp);
         }
         heroHeight = height;
-        ((com.eddyizm.tempus.ui.view.AuraSnapScrollView) scroll).setSnapHeight(height);
+        int anchor = height - (getParentFragment() instanceof HomeFragment
+                ? ((HomeFragment) getParentFragment()).getToolbarHeight() : dp(56));
+        int snapHeight = Math.max(1, anchor);
+        if (bind.getRoot().getSnapHeight() != snapHeight) {
+            bind.getRoot().setSnapHeight(snapHeight);
+            applyHeroScroll(scroll.getScrollY());
+        }
+        int min = bind.getRoot().getSnapHeight() + scroll.getHeight();
+        if (bind.homeLinearLayoutContainer.getMinimumHeight() != min) {
+            bind.homeLinearLayoutContainer.setMinimumHeight(min);
+        }
     }
 
     /** Parallax: the glow and the button drift slower than the page and fade out; the top bar gains a scrim. */
@@ -351,7 +375,15 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
         content.setTranslationY(y * 0.42f);
         content.setAlpha(Math.max(0f, 1f - f * 1.6f));
         bind.homeAuraWave.auraWaveGlow.setTranslationY(y * 0.55f);
-        bind.homeAuraWave.auraWaveHint.setAlpha(Math.max(0f, 0.75f * (1f - f * 4f)));
+        float pull = Math.min(1f, y / Math.max(1f, bind.getRoot().getSnapHeight() * 0.18f));
+        View hint = bind.homeAuraWave.auraWaveHint;
+        hint.setAlpha(0.75f * (1f - pull));
+        hint.setScaleX(1f + 0.16f * pull);
+        hint.setScaleY(1f + 0.16f * pull);
+        hint.setTranslationY(Math.min(y, h * 0.18f) * 0.8f);
+        boolean visible = isResumed() && (y == 0 || y < bind.getRoot().getSnapHeight());
+        bind.homeAuraWave.auraWaveGlow.setRenderingEnabled(visible);
+        bind.homeAuraWave.auraWaveGlow.setAlpha(visible ? Math.min(1f, (1f - f) * 2f) : 0f);
         if (getParentFragment() instanceof HomeFragment) {
             ((HomeFragment) getParentFragment()).setToolbarScrim(Math.max(0f, Math.min(1f, (f - 0.55f) / 0.4f)));
         }
@@ -366,11 +398,12 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
     private void attachWaveBrowser() {
         final ListenableFuture<MediaBrowser> future = mediaBrowserListenableFuture;
         future.addListener(() -> {
-            if (future != mediaBrowserListenableFuture || !future.isDone() || future.isCancelled()) return;
+            if (bind == null || future != mediaBrowserListenableFuture || !future.isDone() || future.isCancelled()) return;
             try {
                 MediaBrowser browser = future.get();
                 waveBrowser = browser;
                 browser.addListener(waveListener);
+                bind.homeAuraWave.auraHomePlayer.bind(browser);
                 updateWaveUi();
             } catch (Exception e) {
                 waveBrowser = null;
@@ -379,6 +412,7 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
     }
 
     private void detachWaveBrowser() {
+        if (bind != null) bind.homeAuraWave.auraHomePlayer.bind(null);
         if (waveBrowser != null) {
             waveBrowser.removeListener(waveListener);
             waveBrowser = null;
@@ -391,7 +425,7 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
         return browser != null
                 && browser.getCurrentMediaItem() != null
                 && HubWave.INSTANCE.isActive()
-                && HubWave.INSTANCE.owns(browser.getCurrentMediaItem().mediaId);
+                && HubWave.INSTANCE.ownsItem(browser.getCurrentMediaItem());
     }
 
     /**
@@ -416,8 +450,12 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
                 browser.addListener(waveListener);
             }
             if (waveIsCurrent()) {
-                if (browser.isPlaying()) browser.pause();
+                if (browser.getPlayWhenReady()) browser.pause();
                 else browser.play();
+                return;
+            }
+            if (browser.getCurrentMediaItem() != null && browser.getPlayWhenReady()) {
+                browser.pause();
                 return;
             }
             startNewWave();
@@ -432,7 +470,7 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
             waveLoading = false;
             if (bind == null) return kotlin.Unit.INSTANCE;
             if (error != null) {
-                bind.homeAuraWave.auraWaveStatus.setText(error);
+                Snackbar.make(bind.getRoot(), error, Snackbar.LENGTH_LONG).show();
             } else if (activity != null) {
                 activity.setBottomSheetInPeek(true);
             }
@@ -444,40 +482,41 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
     private void updateWaveUi() {
         if (bind == null) return;
         boolean current = waveIsCurrent();
-        boolean playing = current && waveBrowser != null && waveBrowser.isPlaying();
+        androidx.media3.common.MediaItem item = waveBrowser != null ? waveBrowser.getCurrentMediaItem() : null;
+        boolean playing = item != null && waveBrowser.getPlayWhenReady();
 
         bind.homeAuraWave.auraWaveProgress.setVisibility(waveLoading ? View.VISIBLE : View.GONE);
-        bind.homeAuraWave.auraWaveIcon.setVisibility(waveLoading ? View.INVISIBLE : View.VISIBLE);
-        bind.homeAuraWave.auraWaveIcon.setImageResource(playing ? R.drawable.ic_pause : R.drawable.ic_play);
-
-        if (waveLoading) {
-            bind.homeAuraWave.auraWaveStatus.setText(R.string.aura_wave_loading);
-        } else if (current) {
-            bind.homeAuraWave.auraWaveStatus.setText(playing ? R.string.aura_wave_playing : R.string.aura_wave_paused);
-        } else if (!HubWave.INSTANCE.isActive()) {
-            CharSequence shown = bind.homeAuraWave.auraWaveStatus.getText();
-            if (shown == null || shown.length() == 0
-                    || getString(R.string.aura_wave_loading).contentEquals(shown)
-                    || getString(R.string.aura_wave_playing).contentEquals(shown)
-                    || getString(R.string.aura_wave_paused).contentEquals(shown)) {
-                bind.homeAuraWave.auraWaveStatus.setText(R.string.aura_wave_hint);
-            }
+        CharSequence artist = playing ? waveBrowser.getMediaMetadata().artist : null;
+        CharSequence title = android.text.TextUtils.isEmpty(artist)
+                ? getString(R.string.aura_wave_display_title) : artist;
+        if (!android.text.TextUtils.equals(bind.homeAuraWave.auraWaveTitle.getText(), title)
+                || bind.homeAuraWave.auraWaveCover.getVisibility() != (playing ? View.VISIBLE : View.GONE)) {
+            androidx.transition.TransitionManager.beginDelayedTransition(bind.homeAuraWave.auraWaveContent,
+                    new androidx.transition.Fade().setDuration(145));
+            bind.homeAuraWave.auraWaveTitle.setText(title);
+            bind.homeAuraWave.auraWaveTitle.setTextSize(playing ? 23 : 30);
+            bind.homeAuraWave.auraWaveTitle.animate().cancel();
+            bind.homeAuraWave.auraWaveTitle.setAlpha(.55f);
+            bind.homeAuraWave.auraWaveTitle.animate().alpha(1f).setDuration(145).start();
         }
-
-        if (playing) startWavePulse();
-        else stopWavePulse();
-
-        bind.homeAuraWave.auraWaveGlow.setPlaying(playing);
-        updateWaveCover(current && waveBrowser != null ? waveBrowser.getCurrentMediaItem() : null);
+        bind.homeAuraWave.auraWaveIcon.setVisibility(waveLoading || playing ? View.INVISIBLE : View.VISIBLE);
+        bind.homeAuraWave.auraWaveCover.setVisibility(playing ? View.VISIBLE : View.GONE);
+        bind.homeAuraWave.auraWaveButton.setContentDescription(getString(playing
+                ? (current ? R.string.aura_pause_wave : R.string.player_queue_pause) : R.string.aura_wave_play));
+        bind.homeAuraWave.auraWaveGlow.setPlaying(playing && current);
+        updateWaveCover(item);
     }
 
     /** The glow takes its colours from the cover of the current wave track (HomeMusic's wave hero does the same). */
     private void updateWaveCover(@Nullable androidx.media3.common.MediaItem item) {
-        if (bind == null) return;
-        android.net.Uri art = item != null ? item.mediaMetadata.artworkUri : null;
+        if (bind == null || item == null) return;
+        android.net.Uri art = item.mediaMetadata.artworkUri;
         String key = art != null ? art.toString() : null;
         if (java.util.Objects.equals(key, waveCoverKey)) return;
         waveCoverKey = key;
+        Glide.with(this).load(art).placeholder(R.drawable.ic_albums).error(R.drawable.ic_albums)
+                .transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade(145))
+                .into(bind.homeAuraWave.auraWaveCover);
         if (waveCoverTarget != null) {
             Glide.with(this).clear(waveCoverTarget);
             waveCoverTarget = null;
@@ -489,45 +528,17 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
         waveCoverTarget = new CustomTarget<Bitmap>(24, 24) {
             @Override
             public void onResourceReady(@NonNull Bitmap resource, @Nullable Transition<? super Bitmap> transition) {
-                if (bind != null) bind.homeAuraWave.auraWaveGlow.setCover(resource);
+                if (bind != null && waveCoverTarget == this) {
+                    bind.homeAuraWave.auraWaveGlow.setCover(resource);
+                }
             }
 
             @Override
             public void onLoadCleared(@Nullable Drawable placeholder) {
             }
 
-            @Override
-            public void onLoadFailed(@Nullable Drawable errorDrawable) {
-                if (bind != null) bind.homeAuraWave.auraWaveGlow.setCover(null);
-            }
         };
         Glide.with(this).asBitmap().load(art).into(waveCoverTarget);
-    }
-
-    private void startWavePulse() {
-        if (wavePulse != null || bind == null) return;
-        // AURA: while the wave plays the glass button "breathes" (its rim and fill), the press keeps the scale.
-        wavePulse = ObjectAnimator.ofPropertyValuesHolder(
-                bind.homeAuraWave.auraWaveIcon,
-                PropertyValuesHolder.ofFloat(View.SCALE_X, 1f, 1.12f),
-                PropertyValuesHolder.ofFloat(View.SCALE_Y, 1f, 1.12f),
-                PropertyValuesHolder.ofFloat(View.ALPHA, 1f, 0.8f));
-        wavePulse.setDuration(1300);
-        wavePulse.setRepeatCount(ValueAnimator.INFINITE);
-        wavePulse.setRepeatMode(ValueAnimator.REVERSE);
-        wavePulse.start();
-    }
-
-    private void stopWavePulse() {
-        if (wavePulse != null) {
-            wavePulse.cancel();
-            wavePulse = null;
-        }
-        if (bind != null) {
-            bind.homeAuraWave.auraWaveIcon.setScaleX(1f);
-            bind.homeAuraWave.auraWaveIcon.setScaleY(1f);
-            bind.homeAuraWave.auraWaveIcon.setAlpha(1f);
-        }
     }
 
     private void init() {
@@ -935,6 +946,7 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
 
     private void initDiscoverSongSlideView() {
         if (homeViewModel.checkHomeSectorVisibility(Constants.HOME_SECTOR_DISCOVERY)) return;
+        bind.homeDiscoverSector.setVisibility(View.VISIBLE);
 
         bind.discoverSongRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false));
         bind.discoverSongRecyclerView.setHasFixedSize(true);
@@ -946,10 +958,10 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
             MusicUtil.ratingFilter(songs);
 
             if (songs == null) {
-                if (bind != null) bind.homeDiscoverSector.setVisibility(View.GONE);
+                if (bind != null) bind.discoverSongRecyclerView.setVisibility(View.GONE);
             } else {
                 if (bind != null)
-                    bind.homeDiscoverSector.setVisibility(!songs.isEmpty() ? View.VISIBLE : View.GONE);
+                    bind.discoverSongRecyclerView.setVisibility(!songs.isEmpty() ? View.VISIBLE : View.GONE);
 
                 discoverSongAdapter.setItems(songs);
             }
@@ -1484,9 +1496,14 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
             if (unchanged) return;
         }
 
-        container.removeAllViews();
-        for (View v : desired) {
-            container.addView(v);
+        for (int index = container.getChildCount() - 1; index >= 0; index--) {
+            if (!desired.contains(container.getChildAt(index))) container.removeViewAt(index);
+        }
+        for (int index = 0; index < desired.size(); index++) {
+            View section = desired.get(index);
+            if (container.getChildAt(index) == section) continue;
+            if (section.getParent() == container) container.removeView(section);
+            container.addView(section, index);
         }
     }
 
@@ -1495,6 +1512,11 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
 
         // AURA_2: My Wave always leads Home.
         desired.add(bind.homeAuraWave.getRoot());
+        if (homeViewModel.getHomeSectorList().stream().anyMatch(sector ->
+                Constants.HOME_SECTOR_DISCOVERY.equals(sector.getId()) && sector.isVisible())) {
+            desired.add(bind.homeDiscoverSector);
+        }
+        desired.add(bind.auraLibraryShortcuts);
 
         if (bind.homeSyncStarredCard.getVisibility() == View.VISIBLE) {
             desired.add(bind.homeSyncStarredCard);
@@ -1512,14 +1534,8 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
             if (!sector.isVisible()) continue;
 
             switch (sector.getId()) {
-                case Constants.HOME_SECTOR_DISCOVERY:
-                    desired.add(bind.homeDiscoverSector);
-                    break;
                 case Constants.HOME_SECTOR_CONTINUE_LISTENING:
                     desired.add(bind.homeContinueListeningSector);
-                    break;
-                case Constants.HOME_SECTOR_MADE_FOR_YOU:
-                    desired.add(bind.homeSimilarTracksSector);
                     break;
                 case Constants.HOME_SECTOR_BEST_OF:
                     desired.add(bind.homeBestOfArtistSector);
@@ -1530,9 +1546,6 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
                 case Constants.HOME_SECTOR_TOP_SONGS:
                     desired.add(bind.homeGridTracksSector);
                     break;
-                case Constants.HOME_SECTOR_STARRED_TRACKS:
-                    desired.add(bind.starredTracksSector);
-                    break;
                 case Constants.HOME_SECTOR_STARRED_ALBUMS:
                     desired.add(bind.starredAlbumsSector);
                     break;
@@ -1541,9 +1554,6 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
                     break;
                 case Constants.HOME_SECTOR_NEW_RELEASES:
                     desired.add(bind.homeNewReleasesSector);
-                    break;
-                case Constants.HOME_SECTOR_FLASHBACK:
-                    desired.add(bind.homeFlashbackSector);
                     break;
                 case Constants.HOME_SECTOR_MOST_PLAYED:
                     desired.add(bind.homeMostPlayedAlbumsSector);
@@ -1612,6 +1622,7 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
     }
 
     public void onMediaClick(Bundle bundle) {
+        if (bind == null || mediaBrowserListenableFuture == null) return;
         if (bundle.containsKey(Constants.MEDIA_MIX)) {
             Child track = bundle.getParcelable(Constants.TRACK_OBJECT);
             activity.setBottomSheetInPeek(true);
@@ -1631,16 +1642,12 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
                             }, 300);
                         });
             }
-        } else if (bundle.containsKey(Constants.MEDIA_CHRONOLOGY)) {
+        } else {
             List<Child> media = bundle.getParcelableArrayList(Constants.TRACKS_OBJECT);
+            if (media == null || media.isEmpty()) return;
             MediaManager.startQueue(mediaBrowserListenableFuture, media, bundle.getInt(Constants.ITEM_POSITION));
             activity.setBottomSheetInPeek(true);
-        } else {
-            MediaManager.startQueue(mediaBrowserListenableFuture, bundle.getParcelableArrayList(Constants.TRACKS_OBJECT), bundle.getInt(Constants.ITEM_POSITION));
-            activity.setBottomSheetInPeek(true);
         }
-        topSongAdapter.notifyDataSetChanged();
-        starredSongAdapter.notifyDataSetChanged();
     }
 
     @Override

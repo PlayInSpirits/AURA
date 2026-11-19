@@ -59,11 +59,13 @@ public class HomeRearrangementDialog extends DialogFragment {
 
         alertDialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             homeRearrangementViewModel.saveHomeSectorList(homeSectorHorizontalAdapter.getItems());
+            parentResult();
             dismiss();
         });
 
         alertDialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> {
             homeRearrangementViewModel.resetHomeSectorList();
+            parentResult();
             dismiss();
         });
     }
@@ -111,5 +113,9 @@ public class HomeRearrangementDialog extends DialogFragment {
             }
         }
         ).attachToRecyclerView(bind.homeSectorItemRecyclerView);
+    }
+
+    private void parentResult() {
+        getParentFragmentManager().setFragmentResult("aura_home_sections", new Bundle());
     }
 }

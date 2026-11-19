@@ -99,6 +99,11 @@ open class Child @JvmOverloads constructor(
     @SerializedName(value = "displayAlbumArtist", alternate = ["albumArtist"])
     var albumArtist: String? = null
 ) : Parcelable {
+    @androidx.room.Ignore
+    @kotlinx.parcelize.IgnoredOnParcel
+    @Transient
+    var auraWaveSession: String? = null
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is Child) return false

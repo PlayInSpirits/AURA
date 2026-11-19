@@ -107,7 +107,7 @@ public class ToolbarFragment extends Fragment {
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         if (item.getItemId() == R.id.action_search) {
-            activity.navController.navigate(R.id.searchFragment);
+            activity.navController.navigate(R.id.auraSearchFragment);
             return true;
         } else if (item.getItemId() == R.id.action_settings) {
             activity.navController.navigate(R.id.settingsFragment);

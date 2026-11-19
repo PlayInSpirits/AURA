@@ -9,6 +9,10 @@ interface MediaServiceExtension {
         item: MediaItem,
         queueTarget: MediaManager.QueueTarget
     ): Boolean
+
+    fun onPlaybackChanged(player: Player, queueTarget: MediaManager.QueueTarget) {}
+
+    fun onTrackEnded(item: MediaItem, positionMs: Long, completed: Boolean) {}
 }
 
 object MediaServiceExtensionRegistry {

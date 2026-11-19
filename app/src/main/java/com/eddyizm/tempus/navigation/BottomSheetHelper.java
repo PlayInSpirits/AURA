@@ -20,6 +20,7 @@ public class BottomSheetHelper {
     // Tracks whether an expansion is being driven programmatically (e.g. from notification intent),
     // preventing premature collapse from async initialization timers until user explicitly collapses.
     private boolean isTargetExpanded = false;
+    private boolean usesInlinePlayer = false;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Runnable pendingStateRunnable;
 
@@ -136,13 +137,18 @@ public class BottomSheetHelper {
             if (playerHeader != null) {
                 float condensedSlideOffset = Math.max(0.0f, Math.min(0.2f, slideOffset - 0.2f)) / 0.2f;
                 playerHeader.setAlpha(1 - condensedSlideOffset);
-                playerHeader.setVisibility(condensedSlideOffset > 0.99 ? View.GONE : View.VISIBLE);
+                playerHeader.setVisibility(usesInlinePlayer || condensedSlideOffset > 0.99 ? View.GONE : View.VISIBLE);
             }
         }
     }
 
     public void setPeekHeight(int peekHeight, float displayDensity) {
         int newPeekPx = (int) (peekHeight * displayDensity);
+        boolean inline = peekHeight == 0;
+        if (usesInlinePlayer != inline) {
+            usesInlinePlayer = inline;
+            animate(isExpanded() ? 1f : 0f);
+        }
         bottomSheetBehavior.setGestureInsetBottomIgnored(false);
         bottomSheetBehavior.setPeekHeight(newPeekPx);
     }

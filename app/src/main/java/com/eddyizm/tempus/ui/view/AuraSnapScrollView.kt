@@ -4,6 +4,7 @@ import android.animation.ValueAnimator
 import android.content.Context
 import android.util.AttributeSet
 import android.view.MotionEvent
+import android.view.ViewConfiguration
 import android.view.animation.OvershootInterpolator
 import androidx.core.widget.NestedScrollView
 
@@ -26,62 +27,64 @@ class AuraSnapScrollView @JvmOverloads constructor(
     var onScrolled: ((Int) -> Unit)? = null
 
     private var snapAnimator: ValueAnimator? = null
-    private var dragging = false
-    private var flung = false
+    private var touchActive = false
+    private var intercepted = false
+    private var startScroll = 0
+    private var startY = 0f
+    private val slop = ViewConfiguration.get(context).scaledTouchSlop
 
     override fun onScrollChanged(l: Int, t: Int, oldl: Int, oldt: Int) {
         super.onScrollChanged(l, t, oldl, oldt)
         onScrolled?.invoke(t)
     }
 
-    override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
             snapAnimator?.cancel()
-            dragging = true
-            flung = false
+            touchActive = true
+            intercepted = false
+            startScroll = scrollY
+            startY = ev.y
         }
-        return super.onInterceptTouchEvent(ev)
+        val handled = super.dispatchTouchEvent(ev)
+        if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) {
+            touchActive = false
+            val h = snapHeight
+            val delta = startY - ev.y
+            if (h > 0 && intercepted) {
+                val target = when {
+                    startScroll < slop && (scrollY >= h * .18f || delta >= h * .18f) -> h
+                    startScroll < slop -> 0
+                    startScroll in h - slop..h + slop && delta < -slop -> 0
+                    scrollY in 1 until h -> if (delta < 0) 0 else h
+                    else -> null
+                }
+                target?.let(::snapTo)
+            }
+        }
+        return handled
     }
 
-    override fun onTouchEvent(ev: MotionEvent): Boolean {
-        when (ev.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                snapAnimator?.cancel()
-                dragging = true
-                flung = false
-            }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                val handled = super.onTouchEvent(ev)
-                dragging = false
-                // A slow release (no fling) inside the hero: settle on the nearest side.
-                if (!flung) post { settle(0) }
-                return handled
-            }
+    override fun onInterceptTouchEvent(ev: MotionEvent): Boolean =
+        super.onInterceptTouchEvent(ev).also {
+            if (it && ev.actionMasked == MotionEvent.ACTION_MOVE) intercepted = true
         }
+
+    override fun onTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.actionMasked == MotionEvent.ACTION_MOVE && kotlin.math.abs(startY - ev.y) > slop) intercepted = true
         return super.onTouchEvent(ev)
     }
 
-    override fun fling(velocityY: Int) {
-        flung = true
-        if (snapHeight > 0 && scrollY in 1 until snapHeight) {
-            settle(velocityY)
-            return
-        }
-        super.fling(velocityY)
+    override fun onOverScrolled(scrollX: Int, scrollY: Int, clampedX: Boolean, clampedY: Boolean) {
+        val preview = if (touchActive && startScroll < slop && snapHeight > 0)
+            scrollY.coerceAtMost((snapHeight * .29f).toInt()) else scrollY
+        super.onOverScrolled(scrollX, preview, clampedX, clampedY)
     }
 
-    /** Springs to the wave (0) or to the sections ([snapHeight]) unless already outside the hero. */
-    private fun settle(velocityY: Int) {
-        val h = snapHeight
-        val y = scrollY
-        if (h <= 0 || dragging || y <= 0 || y >= h) return
-        val target = when {
-            velocityY > 600 -> h
-            velocityY < -600 -> 0
-            y > h * 0.18f -> h
-            else -> 0
-        }
-        snapTo(target)
+    override fun fling(velocityY: Int) {
+        if (touchActive && snapHeight > 0 &&
+            (startScroll < slop || scrollY < snapHeight || (startScroll <= snapHeight + slop && velocityY < 0))) return
+        super.fling(velocityY)
     }
 
     fun snapTo(target: Int) {
@@ -89,8 +92,8 @@ class AuraSnapScrollView @JvmOverloads constructor(
         val from = scrollY
         if (from == target) return
         snapAnimator = ValueAnimator.ofInt(from, target).apply {
-            duration = 620L
-            interpolator = OvershootInterpolator(0.9f)
+            duration = 430L
+            interpolator = OvershootInterpolator(0.7f)
             addUpdateListener { scrollTo(0, it.animatedValue as Int) }
             start()
         }

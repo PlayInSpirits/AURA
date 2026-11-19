@@ -50,6 +50,7 @@ import androidx.preference.SwitchPreference;
 
 import com.eddyizm.tempus.BuildConfig;
 import com.eddyizm.tempus.R;
+import com.eddyizm.tempus.ui.view.AuraAppearance;
 import com.eddyizm.tempus.interfaces.DialogClickCallback;
 import com.eddyizm.tempus.interfaces.ScanCallback;
 import com.eddyizm.tempus.equalizer.EqualizerManager;
@@ -115,6 +116,7 @@ public class SettingsContainerFragment extends PreferenceFragmentCompat {
     private final Handler scanStatusHandler = new Handler(Looper.getMainLooper());
 
     private final Set<String> expandedCategories = new HashSet<>();
+    private com.eddyizm.tempus.ui.view.AuraSettingsCards settingsCards;
 
     private boolean musicFoldersObserved = false;
 
@@ -134,6 +136,8 @@ public class SettingsContainerFragment extends PreferenceFragmentCompat {
 
         if (savedInstanceState != null) {
             pendingEqualizerReload = savedInstanceState.getBoolean(STATE_PENDING_EQUALIZER_RELOAD, false);
+            ArrayList<String> categories = savedInstanceState.getStringArrayList("expandedCategories");
+            if (categories != null) expandedCategories.addAll(categories);
         }
 
         equalizerResultLauncher = registerForActivityResult(
@@ -208,8 +212,6 @@ public class SettingsContainerFragment extends PreferenceFragmentCompat {
     public void onResume() {
         super.onResume();
 
-        expandedCategories.clear();
-
         setStreamingCacheSize();
         setAppLanguage();
         setMusicLibrary();
@@ -249,6 +251,7 @@ public class SettingsContainerFragment extends PreferenceFragmentCompat {
         // An import recreates the screen before it can reach the player, so the reload is handed
         // to the next instance, which binds in onResume.
         outState.putBoolean(STATE_PENDING_EQUALIZER_RELOAD, pendingEqualizerReload);
+        outState.putStringArrayList("expandedCategories", new ArrayList<>(expandedCategories));
     }
 
     @Override
@@ -273,7 +276,7 @@ public class SettingsContainerFragment extends PreferenceFragmentCompat {
             }
         }
 
-        if (BuildConfig.FLAVOR.equals("degoogled")) {
+        if (BuildConfig.FLAVOR.equals("degoogled") || BuildConfig.FLAVOR.equals("aura")) {
             ClickablePreferenceCategory androidAutoCategory = findPreference("settings_androidauto_category_key");
             if (androidAutoCategory != null) {
                 getPreferenceScreen().removePreference(androidAutoCategory);
@@ -289,22 +292,53 @@ public class SettingsContainerFragment extends PreferenceFragmentCompat {
                     if (category.getKey() == null) {
                         category.setKey("category_key_" + i);
                     }
+                    if (BuildConfig.FLAVOR.equals("aura")) {
+                        category.setLayoutResource(R.layout.aura_settings_category);
+                        if ("aura_category".equals(category.getKey())) category.setTitle(R.string.aura_settings_account);
+                    }
                     category.setOnClickListener(cat -> {
                         String key = cat.getKey();
                         if ("lan_playback".equals(key)) {
                             startActivity(new Intent(requireContext(), com.eddyizm.tempus.lan.LanPlaybackActivity.class));
                             return;
                         }
-                        if (expandedCategories.contains(key)) {
-                            expandedCategories.remove(key);
-                        } else {
-                            expandedCategories.add(key);
-                        }
-                        applyAccordionState();
+                        toggleCategory(key);
                     });
                 }
             }
         }
+
+        if (BuildConfig.FLAVOR.equals("aura") && screen != null) {
+            for (String key : new String[]{"network_playback", "lan_playback"}) {
+                Preference preference = findPreference(key);
+                if (preference != null) screen.removePreference(preference);
+            }
+            settingsCards = new com.eddyizm.tempus.ui.view.AuraSettingsCards(requireContext(), key -> {
+                toggleCategory(key);
+                if (expandedCategories.contains(key)) scrollToPreference(key);
+                return kotlin.Unit.INSTANCE;
+            });
+            screen.addPreference(settingsCards);
+        }
+
+        bindAuraColor("aura_edit_logo", AuraAppearance.LOGO);
+        bindAuraColor("aura_edit_settings", AuraAppearance.SETTINGS);
+        bindAuraColor("aura_edit_tiles", AuraAppearance.TILES);
+        Preference resetAppearance = findPreference("aura_reset_appearance");
+        if (resetAppearance != null) resetAppearance.setOnPreferenceClickListener(pref -> {
+            getPreferenceManager().getSharedPreferences().edit()
+                    .remove(AuraAppearance.LOGO).remove(AuraAppearance.SETTINGS).remove(AuraAppearance.TILES)
+                    .remove("aura_wave_softness")
+                    .putBoolean(AuraAppearance.GLOW, true).putBoolean(AuraAppearance.BLUR, true).apply();
+            androidx.preference.SwitchPreference glow = findPreference(AuraAppearance.GLOW);
+            androidx.preference.SwitchPreference blur = findPreference(AuraAppearance.BLUR);
+            androidx.preference.SeekBarPreference softness = findPreference("aura_wave_softness");
+            if (glow != null) glow.setChecked(true);
+            if (blur != null) blur.setChecked(true);
+            if (softness != null) softness.setValue(60);
+            applyAuraAppearance();
+            return true;
+        });
 
         // AURA_2: local hub address. It is the address used at home (Tempus' "local address").
         androidx.preference.EditTextPreference auraLocalHub = findPreference("aura_local_hub");
@@ -344,11 +378,49 @@ public class SettingsContainerFragment extends PreferenceFragmentCompat {
         }
     }
 
+    private void bindAuraColor(String row, String key) {
+        Preference preference = findPreference(row);
+        if (preference == null) return;
+        preference.setSummaryProvider(p -> String.format(java.util.Locale.ROOT,
+                "#%06X", AuraAppearance.color(requireContext(), key) & 0xFFFFFF));
+        preference.setOnPreferenceClickListener(p -> {
+            getChildFragmentManager().setFragmentResultListener("dialog_result_key", this, (request, result) -> {
+                String hex = result.getString("color_key");
+                if (hex == null) return;
+                int color = android.graphics.Color.parseColor(hex.substring(4)) | 0xFF000000;
+                getPreferenceManager().getSharedPreferences().edit().putInt(key, color).apply();
+                applyAuraAppearance();
+                getChildFragmentManager().clearFragmentResultListener(request);
+            });
+            com.eddyizm.tempus.ui.dialog.ColorPickerDialog.newInstance(p.getTitle().toString())
+                    .show(getChildFragmentManager(), "aura_color_picker");
+            return true;
+        });
+    }
+
+    private void applyAuraAppearance() {
+        if (getParentFragment() instanceof SettingsFragment parent) parent.applyAuraSurface();
+        for (String row : new String[]{"aura_edit_logo", "aura_edit_settings", "aura_edit_tiles"}) {
+            Preference pref = findPreference(row);
+            if (pref != null) pref.setSummaryProvider(pref.getSummaryProvider());
+        }
+        if (settingsCards != null) settingsCards.updateSelection(expandedCategories);
+    }
+
+    private void toggleCategory(String key) {
+        if (!expandedCategories.remove(key)) expandedCategories.add(key);
+        applyAccordionState();
+    }
+
     private void applyAccordionState() {
         PreferenceScreen screen = getPreferenceScreen();
         if (screen == null) return;
 
         resetVisibility(screen);
+        if (settingsCards != null) {
+            settingsCards.setVisible(searchQuery.isEmpty());
+            settingsCards.updateSelection(expandedCategories);
+        }
 
         checkSystemEqualizer();
         checkCacheStorage();
@@ -366,6 +438,9 @@ public class SettingsContainerFragment extends PreferenceFragmentCompat {
                 if (pref instanceof PreferenceCategory) {
                     PreferenceCategory category = (PreferenceCategory) pref;
                     boolean expanded = expandedCategories.contains(category.getKey());
+                    if (settingsCards != null && settingsCards.hasTile(category.getKey())) {
+                        category.setVisible(expanded);
+                    }
                     category.setIcon(expanded ? R.drawable.ic_arrow_down : R.drawable.ic_navigate_next);
                     if (!expanded) {
                         for (int j = 0; j < category.getPreferenceCount(); j++) {
@@ -743,7 +818,7 @@ public class SettingsContainerFragment extends PreferenceFragmentCompat {
     }
 
     private void setVersion() {
-        findPreference("version").setSummary(BuildConfig.VERSION_NAME);
+        findPreference("version").setSummary("v" + BuildConfig.VERSION_NAME);
     }
 
     private void actionPermission() {

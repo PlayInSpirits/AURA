@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="aura_wave_display_title">МОЯ ВОЛНА</string>
+    <string name="aura_hub_good_morning">Доброе утро, %1$s</string>
+    <string name="aura_hub_good_day">Добрый день, %1$s</string>
+    <string name="aura_hub_good_evening">Добрый вечер, %1$s</string>
+    <string name="aura_hub_good_night">Доброй ночи, %1$s</string>
+    <string name="aura_shortcut_albums">Альбомы</string>
+    <string name="aura_appearance_title">Оформление AURA</string>
+    <string name="aura_appearance_logo">Логотип и заголовок волны</string>
+    <string name="aura_appearance_settings">Фон настроек</string>
+    <string name="aura_appearance_tiles">Вкладки и карточки</string>
+    <string name="aura_appearance_glow">Мягкое свечение текста</string>
+    <string name="aura_appearance_blur">Анимация фона волны</string>
+    <string name="aura_appearance_softness">Размытие фона волны</string>
+    <string name="aura_appearance_reset">Сбросить</string>
+    <string name="aura_now_playing">Сейчас играет</string>
+    <string name="aura_pause_wave">Приостановить волну</string>
+    <string name="aura_hub_play_error">Не удалось воспроизвести трек из Хаба</string>
+    <string name="aura_settings_screen_title">Настройки</string>
+    <string name="aura_settings_downloads">Загрузки</string>
+    <string name="aura_settings_home">Главный экран</string>
+    <string name="aura_settings_account">Аккаунт и сервер</string>
+    <string name="aura_settings_card_appearance">Цвета и фон волны</string>
+    <string name="aura_settings_card_sound">Эквалайзер и громкость</string>
+    <string name="aura_settings_card_downloads">Офлайн и кэш</string>
+    <string name="aura_settings_card_home">Вид и навигация</string>
+    <string name="aura_player_track_details">Информация о треке</string>
+    <string name="aura_player_speed_menu">Скорость воспроизведения</string>
+    <string name="aura_player_open_album">Открыть альбом</string>
+    <string name="aura_player_close">Свернуть плеер</string>
+    <string name="aura_player_lyrics">Текст песни</string>
+    <string name="aura_player_queue">Очередь</string>
+</resources>

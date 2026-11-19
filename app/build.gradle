@@ -15,8 +15,8 @@ android {
         //noinspection OldTargetApi
         targetSdk = 37
 
-        versionCode 4
-        versionName '0.4.0-beta'
+        versionCode 620
+        versionName '0.62'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
 
         javaCompileOptions {
@@ -115,6 +115,7 @@ dependencies {
     // AndroidX
     implementation libs.androidx.activity
     implementation libs.androidx.activity.ktx
+    implementation 'androidx.webkit:webkit:1.16.0'
     implementation libs.androidx.annotation
     implementation libs.androidx.constraintlayout
     implementation libs.androidx.coordinatorlayout

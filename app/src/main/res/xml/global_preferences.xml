@@ -15,6 +15,29 @@
             app:useSimpleSummaryProvider="true" />
     </com.eddyizm.tempus.util.ClickablePreferenceCategory>
 
+    <com.eddyizm.tempus.util.ClickablePreferenceCategory
+        android:key="aura_appearance"
+        app:title="@string/aura_appearance_title">
+        <Preference android:key="aura_edit_logo" android:title="@string/aura_appearance_logo" />
+        <Preference android:key="aura_edit_settings" android:title="@string/aura_appearance_settings" />
+        <Preference android:key="aura_edit_tiles" android:title="@string/aura_appearance_tiles" />
+        <SwitchPreference
+            android:key="aura_text_glow"
+            android:defaultValue="true"
+            android:title="@string/aura_appearance_glow" />
+        <SwitchPreference
+            android:key="aura_soft_wave"
+            android:defaultValue="true"
+            android:title="@string/aura_appearance_blur" />
+        <SeekBarPreference
+            android:key="aura_wave_softness"
+            android:max="100"
+            android:defaultValue="60"
+            android:title="@string/aura_appearance_softness"
+            app:showSeekBarValue="true" />
+        <Preference android:key="aura_reset_appearance" android:title="@string/aura_appearance_reset" />
+    </com.eddyizm.tempus.util.ClickablePreferenceCategory>
+
     <com.eddyizm.tempus.util.ClickablePreferenceCategory app:title="@string/settings_title_general">
         <Preference
             android:key="scan_library"
@@ -51,7 +74,9 @@
             android:summary="@string/settings_import_summary"/>
     </com.eddyizm.tempus.util.ClickablePreferenceCategory>
 
-    <com.eddyizm.tempus.util.ClickablePreferenceCategory app:title="@string/settings_title_ui">
+    <com.eddyizm.tempus.util.ClickablePreferenceCategory
+        android:key="settings_interface"
+        app:title="@string/settings_title_ui">
         <ListPreference
             android:layout_height="match_parent"
             app:defaultValue="default"
@@ -177,7 +202,9 @@
             android:key="sort_search_chronologically" />
     </com.eddyizm.tempus.util.ClickablePreferenceCategory>
 
-    <com.eddyizm.tempus.util.ClickablePreferenceCategory app:title="@string/settings_title_sound">
+    <com.eddyizm.tempus.util.ClickablePreferenceCategory
+        android:key="settings_sound"
+        app:title="@string/settings_title_sound">
 
         <PreferenceCategory app:title="@string/settings_title_equalizer">
             <ListPreference
@@ -340,7 +367,9 @@
             app:useSimpleSummaryProvider="true" />
     </com.eddyizm.tempus.util.ClickablePreferenceCategory>
 
-    <com.eddyizm.tempus.util.ClickablePreferenceCategory app:title="@string/settings_title_data">
+    <com.eddyizm.tempus.util.ClickablePreferenceCategory
+        android:key="settings_storage"
+        app:title="@string/settings_title_data">
         <ListPreference
             app:defaultValue="256"
             app:dialogTitle="@string/settings_streaming_cache_size"
@@ -694,7 +723,7 @@
             app:title="@string/settings_github_title">
             <intent
                 android:action="android.intent.action.VIEW"
-                android:data="@string/settings_github_link" />
+                android:data="@string/aura_project_url" />
         </Preference>
     </com.eddyizm.tempus.util.ClickablePreferenceCategory>
 

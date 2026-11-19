@@ -9,19 +9,19 @@
     android:background="?attr/colorSurface"
     android:orientation="vertical">
 
-    <LinearLayout
+    <FrameLayout
         android:id="@+id/hub_top_bar"
         android:layout_width="match_parent"
         android:layout_height="56dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="8dp"
-        android:paddingEnd="16dp">
+        android:paddingHorizontal="8dp">
 
         <LinearLayout
             android:id="@+id/hub_back_button"
             android:layout_width="wrap_content"
             android:layout_height="40dp"
+            android:layout_gravity="center_vertical|start"
             android:background="@drawable/aura_glass_pill"
             android:clickable="true"
             android:contentDescription="@string/aura_hub_back"
@@ -49,15 +49,28 @@
         </LinearLayout>
 
         <TextView
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="14dp"
-            android:fontFamily="sans-serif-medium"
-            android:text="@string/aura_hub_title"
-            android:textColor="?attr/colorOnSurface"
+            android:layout_gravity="center"
+            android:text="@string/aura_hub_wordmark"
+            android:textAppearance="@style/AuraDisplay"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="20sp" />
-    </LinearLayout>
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/hub_greeting"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:paddingHorizontal="18dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="12dp"
+        android:maxLines="2"
+        android:textAppearance="@style/AuraDisplay"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="17sp"
+        android:visibility="gone" />
 
     <ProgressBar
         android:id="@+id/hub_progress"
@@ -74,7 +87,28 @@
         android:id="@+id/hub_web_container"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1">
+        <ImageView
+            android:id="@+id/hub_splash_logo"
+            android:layout_width="88dp"
+            android:layout_height="88dp"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:src="@drawable/aura_logo" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/hub_player_space"
+        android:layout_width="match_parent"
+        android:layout_height="72dp"
+        android:visibility="gone">
+
+        <com.eddyizm.tempus.ui.view.AuraMiniPlayer
+            android:id="@+id/hub_native_player"
+            android:layout_width="292dp"
+            android:layout_height="60dp"
+            android:layout_gravity="center" />
+    </FrameLayout>
 
     <LinearLayout
         android:id="@+id/hub_empty"

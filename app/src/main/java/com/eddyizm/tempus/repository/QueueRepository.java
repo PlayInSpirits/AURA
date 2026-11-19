@@ -447,4 +447,19 @@ public class QueueRepository {
             queueDao.replaceQueue(media);
         });
     }
+
+    public void replaceUpcoming(int start, List<Child> songs) {
+        dbExecutor.execute(() -> {
+            List<Queue> queue = queueDao.getAllSimple();
+            int first = Math.min(start, queue.size());
+            queue.subList(first, queue.size()).clear();
+            for (Child song : songs) {
+                if (isMediaInQueue(queue, song)) continue;
+                Queue item = new Queue(song);
+                item.setTrackOrder(queue.size());
+                queue.add(item);
+            }
+            queueDao.replaceQueue(queue);
+        });
+    }
 }

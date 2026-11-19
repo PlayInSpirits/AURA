@@ -1,14 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- AURA: three tabs. «Поиск» replaced «Библиотека», «Скачать» is gone. -->
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
         android:id="@+id/homeFragment"
         android:icon="@drawable/ic_home"
         android:title="@string/menu_home_label" />
-    <item
-        android:id="@+id/auraSearchFragment"
-        android:icon="@drawable/ic_search"
-        android:title="@string/aura_menu_search" />
     <item
         android:id="@+id/hubFragment"
         android:icon="@drawable/ic_hub"

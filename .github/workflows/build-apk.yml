@@ -75,7 +75,11 @@ jobs:
             "$APKSIGNER" sign --ks "$KS" --ks-pass env:AURA_KEYSTORE_PASSWORD --key-pass "pass:$KEY_PASS" \
               --ks-key-alias "$AURA_KEY_ALIAS" --out "$RUNNER_TEMP/signed/$(basename "$apk")" "$apk"
             mv "$RUNNER_TEMP/signed/$(basename "$apk")" "$apk"
-            "$APKSIGNER" verify --print-certs "$apk" | grep -E "certificate (DN|SHA-256)" || true
+            CERTIFICATES="$("$APKSIGNER" verify --print-certs "$apk")"
+            printf '%s\n' "$CERTIFICATES" | grep -E "certificate (DN|SHA-256)"
+            if grep -q "versionName '0.62'" app/build.gradle; then
+              printf '%s\n' "$CERTIFICATES" | grep -Fqi 'certificate SHA-256 digest: b95fc7f2280561fbc41ed620793e828e4613861e533bdbe76a82df54da6250ad'
+            fi
             echo "Signed: $apk"
           done
           rm -f "$KS"
@@ -95,6 +99,8 @@ jobs:
           set -euo pipefail
           VERSION="$(sed -n "s/^ *versionName *['\"]\([^'\"]*\)['\"].*/\1/p" app/build.gradle | head -n 1)"
           [ -n "$VERSION" ] || { echo "::error::versionName not found in app/build.gradle"; exit 1; }
+          # Publish this version from the exact signed artifact after Android emulator validation.
+          if [ "$VERSION" = "0.62" ]; then exit 0; fi
           TAG="aura2-v${VERSION}"
           # With ABI splits on, take the universal APK (it runs on every device).
           APK_SRC="$(ls app/build/outputs/apk/aura/debug/*universal*.apk 2>/dev/null | head -n 1 || true)"

@@ -25,16 +25,24 @@ public class HomeRearrangementViewModel extends AndroidViewModel {
     public List<HomeSector> getHomeSectorList() {
         if (sectors != null && !sectors.isEmpty()) return sectors;
 
-        if (Preferences.getHomeSectorList() != null && !Preferences.getHomeSectorList().equals("null")) {
-            sectors = new Gson().fromJson(
-                    Preferences.getHomeSectorList(),
-                    new TypeToken<List<HomeSector>>() {
-                    }.getType()
-            );
-        } else {
-            sectors = fillStandardHomeSectorList();
-        }
+        sectors = loadHomeSectors(getApplication());
+        return sectors;
+    }
 
+    public static List<HomeSector> loadHomeSectors(Application application) {
+        String saved = Preferences.getHomeSectorList();
+        List<HomeSector> sectors = saved == null ? null : new Gson().fromJson(saved,
+                new TypeToken<List<HomeSector>>() { }.getType());
+        if (sectors == null) return fillStandardHomeSectorList(application);
+        sectors.removeIf(sector -> switch (sector.getId()) {
+            case Constants.HOME_SECTOR_MADE_FOR_YOU, Constants.HOME_SECTOR_STARRED_TRACKS,
+                    Constants.HOME_SECTOR_FLASHBACK -> true;
+            default -> false;
+        });
+        if (sectors.stream().noneMatch(sector -> Constants.HOME_SECTOR_CONTINUE_LISTENING.equals(sector.getId()))) {
+            sectors.add(new HomeSector(Constants.HOME_SECTOR_CONTINUE_LISTENING,
+                    application.getString(R.string.home_title_continue_listening), true, 2));
+        }
         return sectors;
     }
 
@@ -54,25 +62,22 @@ public class HomeRearrangementViewModel extends AndroidViewModel {
         sectors = null;
     }
 
-    private List<HomeSector> fillStandardHomeSectorList() {
+    private static List<HomeSector> fillStandardHomeSectorList(Application application) {
         List<HomeSector> sectors = new ArrayList<>();
 
-        sectors.add(new HomeSector(Constants.HOME_SECTOR_DISCOVERY, getApplication().getString(R.string.home_title_discovery), true, 1));
-        sectors.add(new HomeSector(Constants.HOME_SECTOR_CONTINUE_LISTENING, getApplication().getString(R.string.home_title_continue_listening), true, 2));
-        sectors.add(new HomeSector(Constants.HOME_SECTOR_MADE_FOR_YOU, getApplication().getString(R.string.home_title_made_for_you), true, 2));
-        sectors.add(new HomeSector(Constants.HOME_SECTOR_BEST_OF, getApplication().getString(R.string.home_title_best_of), true, 3));
-        sectors.add(new HomeSector(Constants.HOME_SECTOR_RADIO_STATION, getApplication().getString(R.string.home_title_radio_station), true, 4));
-        sectors.add(new HomeSector(Constants.HOME_SECTOR_TOP_SONGS, getApplication().getString(R.string.home_title_top_songs), true, 5));
-        sectors.add(new HomeSector(Constants.HOME_SECTOR_STARRED_TRACKS, getApplication().getString(R.string.home_title_starred_tracks), true, 6));
-        sectors.add(new HomeSector(Constants.HOME_SECTOR_STARRED_ALBUMS, getApplication().getString(R.string.home_title_starred_albums), true, 7));
-        sectors.add(new HomeSector(Constants.HOME_SECTOR_STARRED_ARTISTS, getApplication().getString(R.string.home_title_starred_artists), true, 8));
-        sectors.add(new HomeSector(Constants.HOME_SECTOR_NEW_RELEASES, getApplication().getString(R.string.home_title_new_releases), true, 9));
-        sectors.add(new HomeSector(Constants.HOME_SECTOR_FLASHBACK, getApplication().getString(R.string.home_title_flashback), true, 10));
-        sectors.add(new HomeSector(Constants.HOME_SECTOR_MOST_PLAYED, getApplication().getString(R.string.home_title_most_played), true, 11));
-        sectors.add(new HomeSector(Constants.HOME_SECTOR_LAST_PLAYED, getApplication().getString(R.string.home_title_last_played), true, 12));
-        sectors.add(new HomeSector(Constants.HOME_SECTOR_RECENTLY_ADDED, getApplication().getString(R.string.home_title_recently_added), true, 13));
-        sectors.add(new HomeSector(Constants.HOME_SECTOR_PINNED_PLAYLISTS, getApplication().getString(R.string.home_title_pinned_playlists), true, 14));
-        sectors.add(new HomeSector(Constants.HOME_SECTOR_SHARED, getApplication().getString(R.string.home_title_shares), true, 15));
+        sectors.add(new HomeSector(Constants.HOME_SECTOR_DISCOVERY, application.getString(R.string.home_title_discovery), true, 1));
+        sectors.add(new HomeSector(Constants.HOME_SECTOR_CONTINUE_LISTENING, application.getString(R.string.home_title_continue_listening), true, 2));
+        sectors.add(new HomeSector(Constants.HOME_SECTOR_PINNED_PLAYLISTS, application.getString(R.string.home_title_pinned_playlists), true, 3));
+        sectors.add(new HomeSector(Constants.HOME_SECTOR_STARRED_ALBUMS, application.getString(R.string.home_title_starred_albums), true, 4));
+        sectors.add(new HomeSector(Constants.HOME_SECTOR_STARRED_ARTISTS, application.getString(R.string.home_title_starred_artists), true, 5));
+        sectors.add(new HomeSector(Constants.HOME_SECTOR_TOP_SONGS, application.getString(R.string.home_title_top_songs), true, 6));
+        sectors.add(new HomeSector(Constants.HOME_SECTOR_BEST_OF, application.getString(R.string.home_title_best_of), true, 7));
+        sectors.add(new HomeSector(Constants.HOME_SECTOR_SHARED, application.getString(R.string.home_title_shares), true, 8));
+        sectors.add(new HomeSector(Constants.HOME_SECTOR_RADIO_STATION, application.getString(R.string.home_title_radio_station), false, 9));
+        sectors.add(new HomeSector(Constants.HOME_SECTOR_NEW_RELEASES, application.getString(R.string.home_title_new_releases), false, 10));
+        sectors.add(new HomeSector(Constants.HOME_SECTOR_MOST_PLAYED, application.getString(R.string.home_title_most_played), false, 11));
+        sectors.add(new HomeSector(Constants.HOME_SECTOR_LAST_PLAYED, application.getString(R.string.home_title_last_played), false, 12));
+        sectors.add(new HomeSector(Constants.HOME_SECTOR_RECENTLY_ADDED, application.getString(R.string.home_title_recently_added), false, 13));
 
         return sectors;
     }

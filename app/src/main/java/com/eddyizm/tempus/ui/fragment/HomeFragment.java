@@ -65,8 +65,15 @@ public class HomeFragment extends Fragment implements com.eddyizm.tempus.navigat
     private void initAppBar() {
         appBarLayout = bind.getRoot().findViewById(R.id.toolbar_fragment);
         materialToolbar = bind.getRoot().findViewById(R.id.toolbar);
+        View title = materialToolbar.findViewById(R.id.toolbar_title_container);
+        title.setVisibility(View.GONE);
+        View logo = bind.getRoot().findViewById(R.id.aura_home_logo);
+        com.eddyizm.tempus.ui.view.AuraAppearance.applyWordmark((android.widget.TextView) logo);
 
         activity.setSupportActionBar(materialToolbar);
+        if (activity.getSupportActionBar() != null) {
+            activity.getSupportActionBar().setDisplayShowTitleEnabled(false);
+        }
         navigationController.setHamburgerMenuForLandscape(activity, materialToolbar);
 
         Objects.requireNonNull(materialToolbar.getOverflowIcon()).setTint(android.graphics.Color.WHITE);
@@ -83,12 +90,18 @@ public class HomeFragment extends Fragment implements com.eddyizm.tempus.navigat
         appBarLayout.setBackground(toolbarScrim);
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(appBarLayout, (v, insets) -> {
             v.setPadding(v.getPaddingLeft(), activity.getStatusBarInset(), v.getPaddingRight(), v.getPaddingBottom());
+            logo.setTranslationY(activity.getStatusBarInset());
             return insets;
         });
+        logo.setTranslationY(activity.getStatusBarInset());
         appBarLayout.setPadding(appBarLayout.getPaddingLeft(), activity.getStatusBarInset(), appBarLayout.getPaddingRight(), appBarLayout.getPaddingBottom());
     }
 
     private android.graphics.drawable.ColorDrawable toolbarScrim;
+
+    public int getToolbarHeight() {
+        return appBarLayout != null ? appBarLayout.getHeight() : 0;
+    }
 
     /** 0 = transparent bar over the wave, 1 = the page background behind the bar. */
     public void setToolbarScrim(float fraction) {

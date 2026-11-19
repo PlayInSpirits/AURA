@@ -21,6 +21,7 @@ import androidx.navigation.fragment.NavHostFragment;
 import androidx.navigation.ui.NavigationUI;
 
 import com.eddyizm.tempus.R;
+import com.eddyizm.tempus.ui.view.AuraAppearance;
 import com.eddyizm.tempus.util.Preferences;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
@@ -60,13 +61,11 @@ public class NavigationHelper {
 
     public void syncWithBottomSheetBehavior(@NonNull BottomSheetBehavior<View> bottomSheetBehavior,
                                             @NonNull NavController navController) {
+        bottomNavigationView.setItemActiveIndicatorEnabled(false);
         navController.addOnDestinationChangedListener(
                 (controller, destination, arguments) -> {
                     applyScreenBackground(destination);
-                    int destId = destination.getId();
-                    if (destId == R.id.homeFragment || destId == R.id.auraSearchFragment) {
-                        lastTabBeforeHub = destId;
-                    }
+                    bottomNavigationView.setItemIconTintList(AuraAppearance.navigationTint(bottomNavigationView.getContext()));
 
                     // React to the user clicking one of these on bottom-navbar/drawer
                     boolean isTarget = isTargetDestination(destination);
@@ -88,13 +87,13 @@ public class NavigationHelper {
         });
     }
 
-    /** AURA: the tab to go back to from the Hub window. */
-    private int lastTabBeforeHub = R.id.homeFragment;
-
     public void leaveHub() {
-        int target = lastTabBeforeHub;
-        if (navController.getCurrentDestination() != null && navController.getCurrentDestination().getId() == target) return;
-        bottomNavigationView.setSelectedItemId(target);
+        if (navController.getCurrentDestination() == null
+                || navController.getCurrentDestination().getId() == R.id.homeFragment) return;
+        if (!navController.popBackStack(R.id.homeFragment, false)) {
+            navController.navigate(R.id.homeFragment, null, new androidx.navigation.NavOptions.Builder()
+                    .setPopUpTo(navController.getGraph().getId(), false).setLaunchSingleTop(true).build());
+        }
     }
 
     /**

@@ -8,4 +8,11 @@
     <item
         android:id="@+id/action_add_to_playlist"
         android:title="@string/player_overflow_menu_add_to_playlist" />
+
+    <group android:id="@+id/player_compact_actions">
+        <item android:id="@+id/action_player_sleep_timer" android:title="@string/sleep_timer_dialog_title" />
+        <item android:id="@+id/action_player_speed" android:title="@string/aura_player_speed_menu" />
+        <item android:id="@+id/action_player_track_details" android:title="@string/aura_player_track_details" />
+        <item android:id="@+id/action_player_open_album" android:title="@string/aura_player_open_album" />
+    </group>
 </menu>

@@ -1,6 +1,7 @@
 package com.eddyizm.tempus.ui.fragment;
 
 import android.content.ComponentName;
+import android.content.res.ColorStateList;
 import android.os.Bundle;
 import android.os.Handler;
 import android.text.TextUtils;
@@ -25,6 +26,7 @@ import androidx.media3.session.MediaBrowser;
 import androidx.media3.session.MediaController;
 import androidx.media3.session.SessionToken;
 
+import com.eddyizm.tempus.BuildConfig;
 import com.eddyizm.tempus.R;
 import com.eddyizm.tempus.databinding.FragmentPlayerBottomSheetBinding;
 import com.eddyizm.tempus.glide.CustomGlideRequest;
@@ -33,6 +35,7 @@ import com.eddyizm.tempus.service.MediaService;
 import com.eddyizm.tempus.subsonic.models.PlayQueue;
 import com.eddyizm.tempus.ui.activity.MainActivity;
 import com.eddyizm.tempus.ui.queue.PlayerQueueBridge;
+import com.eddyizm.tempus.ui.view.AuraAppearance;
 import com.eddyizm.tempus.viewmodel.PlaybackViewModel;
 import com.bumptech.glide.Glide;
 import com.eddyizm.tempus.util.Constants;
@@ -49,6 +52,7 @@ import java.util.stream.IntStream;
 
 @OptIn(markerClass = UnstableApi.class)
 public class PlayerBottomSheetFragment extends Fragment {
+    private static final boolean TITLE_ONLY = "aura".equals(BuildConfig.FLAVOR);
     private boolean remoteVisible = false;
     private final android.content.SharedPreferences.OnSharedPreferenceChangeListener lanSwitchListener = (prefs, key) -> {
         if (Preferences.LAN_REMOTE_ENABLED.equals(key)) renderRemote(com.eddyizm.tempus.lan.LanRemoteSession.current());
@@ -131,6 +135,16 @@ public class PlayerBottomSheetFragment extends Fragment {
     private void customizeBottomSheetAction() {
         bind.playerHeaderLayout.playerHeaderRemoteButton.setOnClickListener(v -> com.eddyizm.tempus.lan.LanDevicePicker.toggle(requireActivity()));
         bind.playerHeaderLayout.getRoot().setOnClickListener(view -> ((MainActivity) requireActivity()).expandBottomSheet());
+        if (TITLE_ONLY) {
+            var header = bind.playerHeaderLayout;
+            header.playerHeaderMediaArtistLabel.setVisibility(View.GONE);
+            ColorStateList tint = ColorStateList.valueOf(AuraAppearance.color(requireContext(), AuraAppearance.TILES));
+            header.playerHeaderButton.setBackgroundTintList(tint);
+            header.playerHeaderNextMediaButton.setBackgroundTintList(tint);
+            header.playerHeaderFastForwardMediaButton.setBackgroundTintList(tint);
+            header.playerHeaderRewindMediaButton.setBackgroundTintList(tint);
+            header.playerHeaderSeekBar.setProgressTintList(tint);
+        }
     }
 
     private void initPlayerController() {
@@ -262,7 +276,9 @@ public class PlayerBottomSheetFragment extends Fragment {
                 String title = mediaMetadata.extras.getString("radioTitle", "");
 
                 String mainTitle;
-                if (!TextUtils.isEmpty(artist) && !TextUtils.isEmpty(title)) {
+                if (TITLE_ONLY && !TextUtils.isEmpty(title)) {
+                    mainTitle = title;
+                } else if (!TextUtils.isEmpty(artist) && !TextUtils.isEmpty(title)) {
                     mainTitle = artist + " - " + title;
                 } else if (!TextUtils.isEmpty(title)) {
                     mainTitle = title;
@@ -276,7 +292,7 @@ public class PlayerBottomSheetFragment extends Fragment {
                 bind.playerHeaderLayout.playerHeaderMediaArtistLabel.setText(stationName);
 
                 bind.playerHeaderLayout.playerHeaderMediaTitleLabel.setVisibility(!TextUtils.isEmpty(mainTitle) ? View.VISIBLE : View.GONE);
-                bind.playerHeaderLayout.playerHeaderMediaArtistLabel.setVisibility(!TextUtils.isEmpty(stationName) ? View.VISIBLE : View.GONE);
+                bind.playerHeaderLayout.playerHeaderMediaArtistLabel.setVisibility(!TITLE_ONLY && !TextUtils.isEmpty(stationName) ? View.VISIBLE : View.GONE);
             } else {
                 // Default (music, podcast, etc.)
                 bind.playerHeaderLayout.playerHeaderMediaTitleLabel.setText(mediaMetadata.extras.getString("title"));
@@ -288,7 +304,7 @@ public class PlayerBottomSheetFragment extends Fragment {
 
                 bind.playerHeaderLayout.playerHeaderMediaTitleLabel.setVisibility(mediaMetadata.extras.getString("title") != null && !Objects.equals(mediaMetadata.extras.getString("title"), "") ? View.VISIBLE : View.GONE);
                 bind.playerHeaderLayout.playerHeaderMediaArtistLabel.setVisibility(
-                        mediaMetadata.extras.getString("artist") != null && !Objects.equals(mediaMetadata.extras.getString("artist"), "")
+                        !TITLE_ONLY && !TextUtils.isEmpty(mediaMetadata.artist)
                                 ? View.VISIBLE
                                 : View.GONE);
             }
@@ -401,7 +417,7 @@ public class PlayerBottomSheetFragment extends Fragment {
             bind.playerHeaderLayout.playerHeaderMediaTitleLabel.setVisibility(View.VISIBLE);
             bind.playerHeaderLayout.playerHeaderMediaArtistLabel.setText(getString(R.string.lan_device_status, state.getName(),
                     getString(state.getError() != 0 ? state.getError() : state.getConnected() ? R.string.lan_remote_active : R.string.lan_connecting)));
-            bind.playerHeaderLayout.playerHeaderMediaArtistLabel.setVisibility(View.VISIBLE);
+            bind.playerHeaderLayout.playerHeaderMediaArtistLabel.setVisibility(TITLE_ONLY ? View.GONE : View.VISIBLE);
             bind.playerHeaderLayout.playerHeaderButton.setChecked(state.getPlayWhenReady());
             bind.playerHeaderLayout.playerHeaderButton.setEnabled(state.getConnected() && state.getCount() > 0);
             bind.playerHeaderLayout.playerHeaderNextMediaButton.setVisibility(View.VISIBLE);

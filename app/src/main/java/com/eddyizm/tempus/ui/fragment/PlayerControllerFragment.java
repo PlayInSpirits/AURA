@@ -57,6 +57,7 @@ import com.eddyizm.tempus.ui.dialog.SleepTimerDialog;
 import com.eddyizm.tempus.util.SleepTimerManager;
 
 import androidx.core.widget.ImageViewCompat;
+import androidx.core.content.ContextCompat;
 import android.content.res.ColorStateList;
 import com.eddyizm.tempus.ui.dialog.RatingDialog;
 import com.eddyizm.tempus.ui.dialog.TrackInfoDialog;
@@ -93,6 +94,7 @@ public class PlayerControllerFragment extends Fragment {
     private ViewPager2 playerMediaCoverViewPager;
     private ToggleButton buttonFavorite;
     private ImageButton playerOverflowButton;
+    private boolean compactPlayer;
     private RatingViewModel ratingViewModel;
     private RatingBar songRatingBar;
     private TextView playerMediaTitleLabel;
@@ -190,7 +192,7 @@ public class PlayerControllerFragment extends Fragment {
             bind.nowPlayingMediaControllerView.setShowFastForwardButton(false);
             bind.nowPlayingMediaControllerView.setShowPreviousButton(true);
             bind.nowPlayingMediaControllerView.setShowNextButton(true);
-            playbackSpeedButton.setVisibility(View.VISIBLE);
+            playbackSpeedButton.setVisibility(compactPlayer ? View.GONE : View.VISIBLE);
             skipSilenceToggleButton.setVisibility(View.GONE);
             buttonFavorite.setVisibility(View.VISIBLE);
             var displayedSong = playerBottomSheetViewModel.getLiveMedia().getValue();
@@ -222,6 +224,9 @@ public class PlayerControllerFragment extends Fragment {
         playerMediaCoverViewPager = bind.getRoot().findViewById(R.id.player_media_cover_view_pager);
         buttonFavorite = bind.getRoot().findViewById(R.id.button_favorite);
         playerOverflowButton = bind.getRoot().findViewById(R.id.player_overflow_button);
+        View close = bind.getRoot().findViewById(R.id.aura_player_grabber);
+        compactPlayer = close instanceof ImageButton;
+        if (compactPlayer) close.setOnClickListener(view -> activity.collapseBottomSheetDelayed());
         playerMediaTitleLabel = bind.getRoot().findViewById(R.id.player_media_title_label);
         playerArtistNameLabel = bind.getRoot().findViewById(R.id.player_artist_name_label);
         playbackSpeedButton = bind.getRoot().findViewById(R.id.player_playback_speed_button);
@@ -268,6 +273,12 @@ public class PlayerControllerFragment extends Fragment {
             playerOverflowButton.setOnClickListener(v -> {
                 PopupMenu popup = new PopupMenu(requireContext(), v);
                 popup.inflate(R.menu.player_overflow_menu);
+                popup.getMenu().setGroupVisible(R.id.player_compact_actions, compactPlayer);
+                popup.getMenu().findItem(R.id.action_player_track_details).setEnabled(playerTrackInfo.hasOnClickListeners());
+                popup.getMenu().findItem(R.id.action_player_speed).setEnabled(playbackSpeedButton.hasOnClickListeners());
+                popup.getMenu().findItem(R.id.action_player_sleep_timer).setEnabled(sleepTimerButton.hasOnClickListeners());
+                popup.getMenu().findItem(R.id.action_player_open_album)
+                        .setVisible(compactPlayer && playerAlbumLinkChip != null && playerAlbumLinkChip.getVisibility() == View.VISIBLE);
 
                 int selectedEq = Preferences.getSelectedEqualizer();
                 if (selectedEq != 1) {
@@ -288,6 +299,14 @@ public class PlayerControllerFragment extends Fragment {
                     } else if (item.getItemId() == R.id.action_add_to_playlist) {
                         openAddToPlaylistDialog();
                         return true;
+                    } else if (item.getItemId() == R.id.action_player_track_details) {
+                        return playerTrackInfo.performClick();
+                    } else if (item.getItemId() == R.id.action_player_speed) {
+                        return playbackSpeedButton.performClick();
+                    } else if (item.getItemId() == R.id.action_player_sleep_timer) {
+                        return sleepTimerButton.performClick();
+                    } else if (item.getItemId() == R.id.action_player_open_album && playerAlbumLinkChip != null) {
+                        return playerAlbumLinkChip.performClick();
                     } else {
                         return false;
                     }
@@ -298,7 +317,7 @@ public class PlayerControllerFragment extends Fragment {
     }
 
     private void initQuickActionView() {
-        playerQuickActionView.setVisibility(Preferences.getQuickActionVisible() ? View.VISIBLE : View.GONE);
+        playerQuickActionView.setVisibility(compactPlayer || Preferences.getQuickActionVisible() ? View.VISIBLE : View.GONE);
         View addToPlaylist = bind.getRoot().findViewById(R.id.player_add_to_playlist_button);
         if (addToPlaylist != null) addToPlaylist.setOnClickListener(view -> openAddToPlaylistDialog());
         updateQueueButtonTint(false);
@@ -556,7 +575,8 @@ public class PlayerControllerFragment extends Fragment {
                     : actual);
         }
 
-        if (Objects.equals(browser.getMediaMetadata().extras.getString("type"), Constants.MEDIA_TYPE_RADIO)) {
+        Bundle extras = browser.getMediaMetadata().extras;
+        if (extras != null && Constants.MEDIA_TYPE_RADIO.equals(extras.getString("type"))) {
             playerMediaBitrate.setText((format.bitrate / 1000) + "kbps");
             playerMediaBitrate.setVisibility(Preferences.getBitrateVisible() ? View.VISIBLE : View.GONE);
         } else if (format.bitrate != Format.NO_VALUE && format.bitrate > 0) {
@@ -691,7 +711,8 @@ public class PlayerControllerFragment extends Fragment {
 
         view.setClickable(true);
         view.setLongClickable(true);
-        AssetLinkUtil.applyLinkAppearance(view);
+        if (compactPlayer) AssetLinkUtil.clearLinkAppearance(view);
+        else AssetLinkUtil.applyLinkAppearance(view);
         view.setOnClickListener(v -> {
             boolean collapse = !AssetLinkUtil.TYPE_SONG.equals(assetLink.type);
             activity.openAssetLink(assetLink, collapse);
@@ -715,7 +736,7 @@ public class PlayerControllerFragment extends Fragment {
                 break;
             }
         }
-        assetLinkChipGroup.setVisibility(hasVisible ? View.VISIBLE : View.GONE);
+        assetLinkChipGroup.setVisibility(hasVisible && !compactPlayer ? View.VISIBLE : View.GONE);
     }
 
     private void setMediaControllerUI(MediaBrowser mediaBrowser) {
@@ -733,7 +754,7 @@ public class PlayerControllerFragment extends Fragment {
                     bind.nowPlayingMediaControllerView.setShowNextButton(false);
                     bind.nowPlayingMediaControllerView.setShowFastForwardButton(true);
                     bind.nowPlayingMediaControllerView.setRepeatToggleModes(RepeatModeUtil.REPEAT_TOGGLE_MODE_NONE);
-                    bind.getRoot().findViewById(R.id.player_playback_speed_button).setVisibility(View.VISIBLE);
+                    playbackSpeedButton.setVisibility(compactPlayer ? View.GONE : View.VISIBLE);
                     bind.getRoot().findViewById(R.id.player_skip_silence_toggle_button).setVisibility(View.VISIBLE);
                     bind.getRoot().findViewById(R.id.button_favorite).setVisibility(View.GONE);
                     setPlaybackParameters(mediaBrowser);
@@ -759,7 +780,7 @@ public class PlayerControllerFragment extends Fragment {
                     bind.nowPlayingMediaControllerView.setShowFastForwardButton(false);
                     bind.nowPlayingMediaControllerView.setRepeatToggleModes(
                             RepeatModeUtil.REPEAT_TOGGLE_MODE_ALL | RepeatModeUtil.REPEAT_TOGGLE_MODE_ONE);
-                    bind.getRoot().findViewById(R.id.player_playback_speed_button).setVisibility(View.VISIBLE);
+                    playbackSpeedButton.setVisibility(compactPlayer ? View.GONE : View.VISIBLE);
                     bind.getRoot().findViewById(R.id.player_skip_silence_toggle_button).setVisibility(View.GONE);
                     bind.getRoot().findViewById(R.id.button_favorite).setVisibility(View.VISIBLE);
                     setPlaybackParameters(mediaBrowser);
@@ -889,21 +910,19 @@ public class PlayerControllerFragment extends Fragment {
     private void updateLyricsButtonTint(boolean isLyricsActive) {
         if (playerOpenLyricsButton == null)
             return;
-        int colorAttr = isLyricsActive
-                ? com.google.android.material.R.attr.colorPrimary
-                : com.google.android.material.R.attr.colorOnSurface;
-        int color = com.google.android.material.color.MaterialColors.getColor(playerOpenLyricsButton, colorAttr);
-        ImageViewCompat.setImageTintList(playerOpenLyricsButton, ColorStateList.valueOf(color));
+        tintPlayerAction(playerOpenLyricsButton, isLyricsActive);
     }
 
     public void updateQueueButtonTint(boolean isQueueActive) {
         if (playerOpenQueueButton == null)
             return;
-        int colorAttr = isQueueActive
-                ? com.google.android.material.R.attr.colorPrimary
-                : com.google.android.material.R.attr.colorOnSurface;
-        int color = com.google.android.material.color.MaterialColors.getColor(playerOpenQueueButton, colorAttr);
-        ImageViewCompat.setImageTintList(playerOpenQueueButton, ColorStateList.valueOf(color));
+        tintPlayerAction(playerOpenQueueButton, isQueueActive);
+    }
+
+    private void tintPlayerAction(ImageButton button, boolean active) {
+        int color = ContextCompat.getColor(button.getContext(),
+                active ? R.color.aura_player_accent : R.color.aura_player_foreground);
+        ImageViewCompat.setImageTintList(button, ColorStateList.valueOf(color));
     }
 
     private void initMediaListenable() {

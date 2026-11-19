@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="20dp"
+    android:paddingTop="4dp"
+    android:paddingEnd="20dp"
+    android:paddingBottom="4dp">
+
+    <LinearLayout
+        android:id="@+id/aura_settings_category_surface"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="54dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="14dp">
+
+        <TextView
+            android:id="@android:id/title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
+            android:textColor="?attr/colorOnSurface" />
+
+        <ImageView
+            android:id="@android:id/icon"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:importantForAccessibility="no" />
+    </LinearLayout>
+</FrameLayout>

@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="aura_player_foreground">#F3EBFC</color>
+    <color name="aura_player_muted">#C6B9D4</color>
+    <color name="aura_player_accent">#D7C2FF</color>
+    <color name="aura_player_on_accent">#28193B</color>
+    <color name="aura_player_surface">#2D223B</color>
+    <color name="aura_player_track">#40334F</color>
     <color name="md_theme_light_primary">#6B4EE6</color>
     <color name="md_theme_light_onPrimary">#FFFFFF</color>
     <color name="md_theme_light_primaryContainer">#E8DEFF</color>
